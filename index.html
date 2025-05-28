@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpertsStage</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .popup-card {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 700px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+        }
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .popup-card h3 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .popup-content {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .author-image {
+            width: 300px;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        .content-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .content-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+        }
+        .content-subtext {
+            color: #666;
+            line-height: 1.6;
+            margin: 0;
+            font-size: 14px;
+        }
+        .view-report-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+        .view-report-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            line-height: 1;
+        }
+        .close-btn:hover {
+            color: #333;
+        }
+        .stats-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #333;
+            z-index: 1001;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+        .stats-panel h4 {
+            margin: 0 0 8px 0;
+            color: #ffffff;
+            font-size: 14px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        .stats-label {
+            color: #cccccc;
+        }
+        .stats-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .stats-value.warning {
+            color: #ffaa00;
+        }
+        .stats-value.error {
+            color: #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-card" id="popup-card">
+        <div class="popup-header">
+            <h3 id="popup-title">Author Name</h3>
+            <button class="close-btn" onclick="closePopup()">&times;</button>
+        </div>
+        <div class="popup-content">
+            <img id="popup-image" class="author-image" src="" alt="Report Image">
+            <div class="content-text">
+                <h4 id="content-title" class="content-title">Expert Title</h4>
+                <p id="content-subtext" class="content-subtext">Expert information will appear here.</p>
+            </div>
+        </div>
+        <button class="view-report-btn" id="view-report-btn" onclick="openReport()">View Report</button>
+    </div>
+
+    <div class="stats-panel" id="stats-panel">
+        <h4>Performance Metrics</h4>
+        <div class="stats-row">
+            <span class="stats-label">FPS:</span>
+            <span class="stats-value" id="fps-value">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Frame Time:</span>
+            <span class="stats-value" id="frame-time-value">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Model Load:</span>
+            <span class="stats-value" id="model-load-time">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Textures Load:</span>
+            <span class="stats-value" id="texture-load-time">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Config Load:</span>
+            <span class="stats-value" id="config-load-time">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Total Load:</span>
+            <span class="stats-value" id="total-load-time">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Memory:</span>
+            <span class="stats-value" id="memory-usage">--</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Triangles:</span>
+            <span class="stats-value" id="triangle-count">--</span>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.176.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.176.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        // Import Three.js using import map
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+        import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        
+        console.log("Script started");
+        
+        let scene, camera, renderer, controls;
+        let authorObjects = [];
+        let categoriesObjects = [];
+        let authorTextObjects = [];
+        let categoriesTitleObjects = [];
+        let raycaster, mouse;
+        let composer, ssrPass, fxaaPass;
+        let floorObject = null;
+        let authorTextures = {};
+        let authorTextTextures = {};
+        let categoryTitleTextures = {};
+        let currentAuthorNumber = null;
+        let textAndLinksConfig = null;
+        let texturesLoaded = 0;
+        let modelLoaded = false;
+        let hoveredCategory = null;
+        let categoryGroups = {}; // Store grouped objects for each category
+        let lockedCategory = null; // Store which category is locked facing camera
+        let originalCameraTarget = null; // Store original camera target for reset
+        let originalCameraPosition = null; // Store original camera position for zoom reset
+        let cameraAnimationComplete = false; // Track if initial camera animation is done
+        let mouseFollowEnabled = false; // Track if mouse following is enabled
+        let mousePosition = { x: 0, y: 0 }; // Normalized mouse position (-1 to 1)
+        let targetCameraPosition = null; // Target position for smooth mouse following
+        let cameraTransitioning = false; // Track if camera is in transition to prevent conflicts
+        
+        // Performance monitoring variables
+        let performanceStats = {
+            fps: 0,
+            frameTime: 0,
+            lastTime: performance.now(),
+            frameCount: 0,
+            fpsUpdateInterval: 60, // Update FPS every 60 frames
+            startTime: performance.now(),
+            modelLoadStart: 0,
+            modelLoadEnd: 0,
+            textureLoadStart: 0,
+            textureLoadEnd: 0,
+            configLoadStart: 0,
+            configLoadEnd: 0,
+            triangleCount: 0
+        };
+
+        // Create text texture for opacity mapping
+        function createTextTexture(text, fontSize = 64, fontFamily = 'Arial', textColor = '#ffffff', backgroundColor = '#000000') {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Use fixed canvas size for all category titles to ensure uniform scaling and alignment
+            const canvasWidth = 600;  // Fixed width for all category titles
+            const canvasHeight = 600; // Fixed height for all category titles
+            
+            // Set canvas size as fixed square
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // Enable high-quality text rendering
+            context.textRenderingOptimization = 'optimizeQuality';
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            
+            // Set background
+            context.fillStyle = backgroundColor;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Set text properties with fixed font size for consistency
+            context.fillStyle = textColor;
+            context.font = `bold ${fontSize}px ${fontFamily}`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Add text shadow for better visibility and crispness
+            context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            context.shadowBlur = 2;
+            context.shadowOffsetX = 1;
+            context.shadowOffsetY = 1;
+            
+            // Draw text centered in the square canvas
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            // Create texture with proper settings for crisp text
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.flipY = false;
+            texture.generateMipmaps = false; // Disable mipmaps for crisp text
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            
+            // Set proper color space for text textures
+            texture.colorSpace = THREE.SRGBColorSpace;
+            
+            return texture;
+        }
+        
+        // Create multi-line text texture for opacity mapping
+        function createMultiLineTextTexture(text, baseFontSize = 64, fontFamily = 'Arial', textColor = '#ffffff', backgroundColor = '#000000') {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Split text into lines
+            const lines = text.split('\n');
+            
+            // Fixed font sizes for absolute consistency across all cards
+            const nameFontSize = 56;      // Fixed size for names
+            const titleFontSize = 46;     // Fixed size for author titles  
+            const reportFontSize = 36;    // Fixed size for report titles
+            const lineHeight = 68;        // Fixed line height for consistency
+            
+            // Function to wrap text if it's too long
+            function wrapText(text, fontSize, maxWidth) {
+                context.font = `normal ${fontSize}px ${fontFamily}`;
+                const words = text.split(' ');
+                const wrappedLines = [];
+                let currentLine = '';
+                
+                for (let word of words) {
+                    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                    const metrics = context.measureText(testLine);
+                    
+                    if (metrics.width > maxWidth && currentLine) {
+                        wrappedLines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                
+                if (currentLine) {
+                    wrappedLines.push(currentLine);
+                }
+                
+                return wrappedLines;
+            }
+            
+            // Process each line and handle wrapping for report titles
+            let maxWidth = 0;
+            const lineMetrics = [];
+            const maxReportTitleWidth = 600; // Maximum width before wrapping
+            
+            lines.forEach((line, index) => {
+                let currentFontSize, fontWeight;
+                let processedLines = [line]; // Default to single line
+                
+                if (index === 0) {
+                    // Name - fixed size, bold
+                    currentFontSize = nameFontSize;
+                    fontWeight = 'bold';
+                } else if (index === 1) {
+                    // Author Title - fixed size, normal
+                    currentFontSize = titleFontSize;
+                    fontWeight = 'normal';
+                } else {
+                    // Report Title - fixed size, normal, with wrapping
+                    currentFontSize = reportFontSize;
+                    fontWeight = 'normal';
+                    processedLines = wrapText(line, currentFontSize, maxReportTitleWidth);
+                }
+                
+                // Process each line (wrapped or single)
+                processedLines.forEach(processedLine => {
+                    context.font = `${fontWeight} ${currentFontSize}px ${fontFamily}`;
+                    const metrics = context.measureText(processedLine);
+                    const lineWidth = metrics.width;
+                    maxWidth = Math.max(maxWidth, lineWidth);
+                    
+                    lineMetrics.push({
+                        text: processedLine,
+                        width: lineWidth,
+                        fontSize: currentFontSize,
+                        fontWeight: fontWeight
+                    });
+                });
+            });
+            
+            // Calculate canvas size - use fixed size for absolute consistency
+            const padding = 0; // Reduced padding since we're going to far left
+            const totalHeight = lineMetrics.length * lineHeight;
+            
+            // Use fixed canvas size for all cards to ensure uniform scaling and alignment
+            const canvasWidth = 600;  // Fixed width for all cards
+            const canvasHeight = 600; // Fixed height for all cards
+            
+            // Set canvas size as fixed rectangle
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // Enable high-quality text rendering
+            context.textRenderingOptimization = 'optimizeQuality';
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            
+            // Set background
+            context.fillStyle = backgroundColor;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw each line with far-left alignment and static author name positioning
+            const authorNameY = 160;  // Fixed Y position for author name across all cards
+            const leftMargin = 0;   // Minimal left margin - almost at edge
+            
+            lineMetrics.forEach((lineData, index) => {
+                let y;
+                
+                if (index === 0) {
+                    // Author name - fixed position for horizontal alignment across all cards
+                    y = authorNameY;
+                } else {
+                    // Other lines - positioned relative to author name
+                    y = authorNameY + (index * lineHeight);
+                }
+                
+                // Set font for this line with exact sizing
+                context.font = `${lineData.fontWeight} ${lineData.fontSize}px ${fontFamily}`;
+                context.fillStyle = textColor;
+                context.textAlign = 'left';
+                context.textBaseline = 'middle';
+                
+                // Add text shadow for better visibility
+                context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                context.shadowBlur = 2;
+                context.shadowOffsetX = 1;
+                context.shadowOffsetY = 1;
+                
+                // Draw the line at far left with minimal margin
+                context.fillText(lineData.text, leftMargin, y);
+            });
+            
+            // Create texture with proper settings for crisp text
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.flipY = false;
+            texture.generateMipmaps = false;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            
+            // Set proper color space for multi-line text textures
+            texture.colorSpace = THREE.SRGBColorSpace;
+            
+            return texture;
+        }
+        
+        // Generate text textures for authors
+        function generateAuthorTextTextures() {
+            if (!textAndLinksConfig || !textAndLinksConfig.authors) {
+                console.warn('Text and links config not loaded, using fallback author names');
+                // Fallback author names with three-line format
+                for (let i = 1; i <= 8; i++) {
+                    const text = `Author ${i}\nSenior Expert\nTechnology Implementation Report`;
+                    authorTextTextures[i] = createMultiLineTextTexture(text, 64, 'Arial', '#ffffff', '#000000');
+                }
+                return;
+            }
+            
+            // Generate textures from config with three-line format
+            Object.keys(textAndLinksConfig.authors).forEach(authorNum => {
+                const authorData = textAndLinksConfig.authors[authorNum];
+                const name = authorData.name || `Author ${authorNum}`;
+                const authorTitle = authorData.authorTitle || 'Senior Expert';
+                const reportTitle = authorData.reportTitle || 'Technology Implementation Report';
+                const text = `${name}\n${authorTitle}\n${reportTitle}`;
+                authorTextTextures[authorNum] = createMultiLineTextTexture(text, 64, 'Arial', '#ffffff', '#000000');
+                console.log(`Generated text texture for: ${name} - ${authorTitle} - ${reportTitle}`);
+            });
+        }
+        
+        // Generate text textures for categories
+        function generateCategoryTitleTextures() {
+            // Fixed font size for consistent category title sizing across all objects
+            const categoryTitleFontSize = 48;
+            
+            if (!textAndLinksConfig || !textAndLinksConfig.categories) {
+                console.warn('Category config not found, using fallback category titles');
+                // Fallback category titles
+                const fallbackTitles = [
+                    'Technology Innovation',
+                    'Research & Development', 
+                    'Strategic Solutions',
+                    'Industry Leadership'
+                ];
+                
+                for (let i = 1; i <= 4; i++) {
+                    const text = fallbackTitles[i - 1] || `Category ${i}`;
+                    categoryTitleTextures[i] = createTextTexture(text, categoryTitleFontSize, 'Arial', '#ffffff', '#000000');
+                }
+                return;
+            }
+            
+            // Generate textures from config with consistent font size
+            Object.keys(textAndLinksConfig.categories).forEach(categoryNum => {
+                const categoryData = textAndLinksConfig.categories[categoryNum];
+                const text = categoryData.title || `Category ${categoryNum}`;
+                categoryTitleTextures[categoryNum] = createTextTexture(text, categoryTitleFontSize, 'Arial', '#ffffff', '#000000');
+                console.log(`Generated category title texture for: ${text}`);
+            });
+        }
+        
+        // Camera mouse following function
+        function updateCameraFollowMouse() {
+            if (!originalCameraPosition || !originalCameraTarget) return;
+            
+            // Calculate enhanced camera movement based on mouse position
+            const followStrength = 1.8; // How much the camera follows the mouse (0-1) - increased from 1.0
+            const followRange = 15; // Maximum distance the camera can move from original position - increased from 6
+            
+            // Movement range limits to prevent camera from going too far
+            const maxMovementX = 24; // Maximum X movement from original position
+            const maxMovementY = 7;  // Maximum Y movement from original position
+            const maxMovementZ = 5;  // Maximum Z movement from original position
+            
+            // Calculate offset from mouse position
+            const offsetX = mousePosition.x * followRange * followStrength;
+            const offsetY = mousePosition.y * followRange * followStrength * 0.5; // Reduce vertical movement
+            
+            // Calculate target position
+            if (!targetCameraPosition) {
+                targetCameraPosition = originalCameraPosition.clone();
+            }
+            
+            const newTargetPosition = originalCameraPosition.clone();
+            newTargetPosition.x += offsetX;
+            newTargetPosition.y += offsetY;
+            
+            // Apply movement range limits
+            const deltaX = newTargetPosition.x - originalCameraPosition.x;
+            const deltaY = newTargetPosition.y - originalCameraPosition.y;
+            const deltaZ = newTargetPosition.z - originalCameraPosition.z;
+            
+            // Clamp the deltas to the maximum movement ranges
+            const clampedDeltaX = Math.max(-maxMovementX, Math.min(maxMovementX, deltaX));
+            const clampedDeltaY = Math.max(-maxMovementY, Math.min(maxMovementY, deltaY));
+            const clampedDeltaZ = Math.max(-maxMovementZ, Math.min(maxMovementZ, deltaZ));
+            
+            // Apply clamped position
+            newTargetPosition.x = originalCameraPosition.x + clampedDeltaX;
+            newTargetPosition.y = originalCameraPosition.y + clampedDeltaY;
+            newTargetPosition.z = originalCameraPosition.z + clampedDeltaZ;
+            
+            // Smooth interpolation to target position
+            const lerpFactor = 0.06; // How smooth the movement is (lower = smoother) - increased from 0.03 for faster response
+            targetCameraPosition.lerp(newTargetPosition, lerpFactor);
+            
+            // Apply the position
+            camera.position.copy(targetCameraPosition);
+            
+            // Optionally adjust the target slightly as well for more dynamic feel
+            const targetOffset = originalCameraTarget.clone();
+            targetOffset.x += clampedDeltaX * 0.4; // Use clamped values for target offset too
+            targetOffset.y += clampedDeltaY * 0.4;
+            
+            controls.target.lerp(targetOffset, lerpFactor);
+        }
+        
+        // Smooth transition back to mouse following
+        function smoothTransitionToMouseFollow() {
+            // Mark as transitioning to prevent conflicts
+            cameraTransitioning = true;
+            mouseFollowEnabled = false;
+            
+            // Calculate where the camera should be based on current mouse position
+            const followStrength = 1.8;
+            const followRange = 15;
+            const offsetX = mousePosition.x * followRange * followStrength;
+            const offsetY = mousePosition.y * followRange * followStrength * 0.5;
+            
+            // Movement range limits (same as in updateCameraFollowMouse)
+            const maxMovementX = 12;
+            const maxMovementY = 8;
+            const maxMovementZ = 5;
+            
+            const targetMousePosition = originalCameraPosition.clone();
+            targetMousePosition.x += offsetX;
+            targetMousePosition.y += offsetY;
+            
+            // Apply movement range limits
+            const deltaX = targetMousePosition.x - originalCameraPosition.x;
+            const deltaY = targetMousePosition.y - originalCameraPosition.y;
+            const deltaZ = targetMousePosition.z - originalCameraPosition.z;
+            
+            // Clamp the deltas to the maximum movement ranges
+            const clampedDeltaX = Math.max(-maxMovementX, Math.min(maxMovementX, deltaX));
+            const clampedDeltaY = Math.max(-maxMovementY, Math.min(maxMovementY, deltaY));
+            const clampedDeltaZ = Math.max(-maxMovementZ, Math.min(maxMovementZ, deltaZ));
+            
+            // Apply clamped position
+            targetMousePosition.x = originalCameraPosition.x + clampedDeltaX;
+            targetMousePosition.y = originalCameraPosition.y + clampedDeltaY;
+            targetMousePosition.z = originalCameraPosition.z + clampedDeltaZ;
+            
+            const targetMouseTarget = originalCameraTarget.clone();
+            targetMouseTarget.x += clampedDeltaX * 0.4;
+            targetMouseTarget.y += clampedDeltaY * 0.4;
+            
+            // Store current positions
+            const currentPosition = camera.position.clone();
+            const currentTarget = controls.target.clone();
+            
+            // Animate to mouse-following position
+            const duration = 600; // Reduced to 0.6 second for snappier feel
+            const startTime = Date.now();
+            
+            function animateToMouseFollow() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Smooth easing
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                // Interpolate to mouse-following position
+                camera.position.lerpVectors(currentPosition, targetMousePosition, easeOut);
+                controls.target.lerpVectors(currentTarget, targetMouseTarget, easeOut);
+                
+                // Update target camera position for smooth continuation
+                if (!targetCameraPosition) {
+                    targetCameraPosition = originalCameraPosition.clone();
+                }
+                targetCameraPosition.lerpVectors(currentPosition, targetMousePosition, easeOut);
+                
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateToMouseFollow);
+            } else {
+                    // Transition complete - enable mouse following
+                    cameraTransitioning = false;
+                    mouseFollowEnabled = true;
+                    console.log("Smooth transition to mouse following complete");
+                }
+            }
+            
+            animateToMouseFollow();
+        }
+        
+        // Simple camera reset to default without tilt animation
+        function resetCameraToDefault() {
+            if (!originalCameraTarget || !originalCameraPosition) return;
+            
+            // Disable mouse following and mark as transitioning
+            mouseFollowEnabled = false;
+            cameraTransitioning = true;
+            
+            // Store current target and position
+            const currentTarget = controls.target.clone();
+            const currentPosition = camera.position.clone();
+            
+            // Animate camera directly back to original position
+            const duration = 800; // Faster than full reset
+            const startTime = Date.now();
+            
+            function animateDirectReset() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Smooth easing
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                // Interpolate directly to original position
+                controls.target.lerpVectors(currentTarget, originalCameraTarget, easeOut);
+                camera.position.lerpVectors(currentPosition, originalCameraPosition, easeOut);
+                
+                controls.update();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateDirectReset);
+                } else {
+                    // Reset complete - prepare for smooth transition to mouse following
+                    targetCameraPosition = originalCameraPosition.clone();
+                    cameraTransitioning = false;
+                    
+                    // Start smooth transition to mouse following after a brief delay
+                    setTimeout(() => {
+                        if (cameraAnimationComplete && !lockedCategory) {
+                            // Ensure camera is exactly at original position before transitioning
+                            camera.position.copy(originalCameraPosition);
+                            controls.target.copy(originalCameraTarget);
+                            controls.update();
+                            
+                            smoothTransitionToMouseFollow();
+                        }
+                    }, 100);
+                    
+                    console.log("Camera reset to default position, preparing for mouse following");
+                }
+            }
+            
+            animateDirectReset();
+        }
+        
+        // Performance monitoring functions
+        function updatePerformanceStats() {
+            const currentTime = performance.now();
+            const deltaTime = currentTime - performanceStats.lastTime;
+            performanceStats.frameTime = deltaTime;
+            performanceStats.frameCount++;
+            
+            // Update FPS every N frames for smoother display
+            if (performanceStats.frameCount % performanceStats.fpsUpdateInterval === 0) {
+                performanceStats.fps = Math.round(1000 / deltaTime);
+                updateStatsDisplay();
+            }
+            
+            performanceStats.lastTime = currentTime;
+        }
+        
+        function updateStatsDisplay() {
+            // FPS with color coding
+            const fpsElement = document.getElementById('fps-value');
+            const fps = performanceStats.fps;
+            fpsElement.textContent = fps;
+            fpsElement.className = 'stats-value';
+            if (fps < 30) fpsElement.className += ' error';
+            else if (fps < 50) fpsElement.className += ' warning';
+            
+            // Frame time
+            const frameTimeElement = document.getElementById('frame-time-value');
+            frameTimeElement.textContent = `${performanceStats.frameTime.toFixed(1)}ms`;
+            frameTimeElement.className = 'stats-value';
+            if (performanceStats.frameTime > 33) frameTimeElement.className += ' error';
+            else if (performanceStats.frameTime > 20) frameTimeElement.className += ' warning';
+            
+            // Load times
+            if (performanceStats.modelLoadEnd > 0) {
+                const modelLoadTime = performanceStats.modelLoadEnd - performanceStats.modelLoadStart;
+                document.getElementById('model-load-time').textContent = `${modelLoadTime.toFixed(0)}ms`;
+            }
+            
+            if (performanceStats.textureLoadEnd > 0) {
+                const textureLoadTime = performanceStats.textureLoadEnd - performanceStats.textureLoadStart;
+                document.getElementById('texture-load-time').textContent = `${textureLoadTime.toFixed(0)}ms`;
+            }
+            
+            if (performanceStats.configLoadEnd > 0) {
+                const configLoadTime = performanceStats.configLoadEnd - performanceStats.configLoadStart;
+                document.getElementById('config-load-time').textContent = `${configLoadTime.toFixed(0)}ms`;
+            }
+            
+            // Total load time
+            const totalLoadTime = performance.now() - performanceStats.startTime;
+            document.getElementById('total-load-time').textContent = `${totalLoadTime.toFixed(0)}ms`;
+            
+            // Memory usage (if available)
+            if (performance.memory) {
+                const memoryMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
+                document.getElementById('memory-usage').textContent = `${memoryMB}MB`;
+            } else {
+                document.getElementById('memory-usage').textContent = 'N/A';
+            }
+            
+            // Triangle count
+            if (performanceStats.triangleCount > 0) {
+                const triangles = performanceStats.triangleCount.toLocaleString();
+                document.getElementById('triangle-count').textContent = triangles;
+            }
+        }
+        
+        function countTriangles(object) {
+            let triangleCount = 0;
+            object.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geometry = child.geometry;
+                    if (geometry.index) {
+                        triangleCount += geometry.index.count / 3;
+                    } else if (geometry.attributes.position) {
+                        triangleCount += geometry.attributes.position.count / 3;
+                    }
+                }
+            });
+            return Math.floor(triangleCount);
+        }
+        
+        // Popup functions
+        window.closePopup = function() {
+            document.getElementById('popup-card').style.display = 'none';
+            
+            // Re-enable camera controls and smoothly transition to mouse following (if no category is locked)
+            controls.enabled = true;
+            if (cameraAnimationComplete && !lockedCategory) {
+                smoothTransitionToMouseFollow();
+            }
+        }
+        
+        window.openReport = function() {
+            if (currentAuthorNumber && textAndLinksConfig?.authors?.[currentAuthorNumber]?.link) {
+                window.open(textAndLinksConfig.authors[currentAuthorNumber].link, '_blank');
+            } else {
+                alert('Report link not available yet.');
+            }
+        }
+        
+
+        
+        // Load text and links configuration
+        async function loadTextAndLinksConfig() {
+            performanceStats.configLoadStart = performance.now();
+            try {
+                const response = await fetch('text-and-links.json');
+                textAndLinksConfig = await response.json();
+                performanceStats.configLoadEnd = performance.now();
+                console.log('Text and links configuration loaded successfully');
+            } catch (error) {
+                performanceStats.configLoadEnd = performance.now();
+                console.error('Error loading text and links configuration:', error);
+                // Fallback configuration
+                textAndLinksConfig = {
+                    authors: {
+                        "1": { name: "Dr. Sarah Chen", authorTitle: "Senior Cloud Architect", reportTitle: "Cloud Infrastructure for AI: A Strategic Guide", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "2": { name: "Marcus Rodriguez", authorTitle: "Principal Data Scientist", reportTitle: "Generative AI Applications in Enterprise", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "3": { name: "Dr. Aisha Patel", authorTitle: "Chief Technology Officer", reportTitle: "Digital Transformation Roadmap 2024", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "4": { name: "James Thompson", authorTitle: "Solutions Architect", reportTitle: "Public Sector AI Implementation Framework", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "5": { name: "Dr. Elena Kowalski", authorTitle: "Research Director", reportTitle: "Machine Learning Innovation Trends Report", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "6": { name: "David Kim", authorTitle: "Enterprise Architect", reportTitle: "Secure Cloud Architecture Best Practices", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "7": { name: "Dr. Rachel Foster", authorTitle: "AI Ethics Researcher", reportTitle: "Responsible AI Development Guidelines", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" },
+                        "8": { name: "Michael Zhang", authorTitle: "Technical Program Manager", reportTitle: "AI Implementation Strategy Playbook", subtext: "Expert information", link: "https://get.itexpertresource.com/aws/the-public-sector-journey-to-generative-ai-a-cios-guide-to-strategic-implementation/" }
+                    },
+                    categories: {
+                        "1": { title: "Technology Innovation" },
+                        "2": { title: "Research & Development" },
+                        "3": { title: "Strategic Solutions" },
+                        "4": { title: "Industry Leadership" }
+                    }
+                };
+            }
+            
+            // Generate text textures after config is loaded
+            generateAuthorTextTextures();
+            generateCategoryTitleTextures();
+        }
+
+        function showPopup(authorName, authorObject) {
+            const popup = document.getElementById('popup-card');
+            const title = document.getElementById('popup-title');
+            const contentTitle = document.getElementById('content-title');
+            const contentSubtext = document.getElementById('content-subtext');
+            const image = document.getElementById('popup-image');
+            
+            // Extract author number from name (e.g., "Author1" -> "1")
+            const authorNumber = authorName.replace(/\D/g, '');
+            currentAuthorNumber = authorNumber;
+            
+            // Get configuration for this author
+            const authorConfig = textAndLinksConfig?.authors?.[authorNumber];
+            
+            if (authorConfig) {
+                title.textContent = authorConfig.name;
+                contentTitle.textContent = authorConfig.authorTitle;
+                contentSubtext.textContent = authorConfig.subtext;
+            } else {
+                // Fallback content
+                title.textContent = authorName;
+                contentTitle.textContent = `Senior Expert ${authorNumber}`;
+                contentSubtext.textContent = `Information about ${authorName}. This expert has contributed significantly to the field and brings valuable insights to our platform.`;
+            }
+            
+            // Set report image (changed from Authors webp to Reports webp)
+            if (authorNumber) {
+                image.src = `Reports webp/Report${authorNumber}.webp`;
+                image.style.display = 'block';
+            } else {
+                image.style.display = 'none';
+            }
+            
+            popup.style.display = 'block';
+            
+            // Disable camera controls and mouse following when popup is open
+            controls.enabled = false;
+            mouseFollowEnabled = false;
+        }
+        
+        try {
+            console.log("Three.js imported successfully");
+
+            // Scene, camera, renderer
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000); // Black background
+            
+            // Add black fog in the distance
+            scene.fog = new THREE.Fog(0x000000, 80, 200);
+            
+            console.log("Scene created");
+            
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 8, 500);
+            camera.position.set(0, 5, 1);
+            console.log("Camera created");
+            
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance",
+                stencil: false,
+                depth: true,
+                logarithmicDepthBuffer: false,
+                preserveDrawingBuffer: false
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Enhanced pixel ratio for better antialiasing
+            const pixelRatio = Math.min(window.devicePixelRatio, 3); // Cap at 2x for performance
+            renderer.setPixelRatio(pixelRatio);
+            
+            // Enhanced rendering quality settings
+            renderer.outputColorSpace = THREE.SRGBColorSpace; // Changed from LinearSRGBColorSpace to SRGBColorSpace for proper texture display
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2; // Slightly increased for better brightness with ambient light
+
+            
+            // Additional quality improvements
+            renderer.sortObjects = true;
+            renderer.autoClear = true;
+            renderer.autoClearColor = true;
+            renderer.autoClearDepth = true;
+            renderer.autoClearStencil = true;
+            
+            // Disable shadows to eliminate potential line artifacts
+            renderer.shadowMap.enabled = false;
+            // renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+            // renderer.shadowMap.autoUpdate = true;
+            
+            document.body.appendChild(renderer.domElement);
+            console.log("Renderer created and added to DOM");
+            
+            // Set up enhanced post-processing with antialiasing
+            composer = new EffectComposer(renderer);
+            
+            // Add the main render pass
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+            
+            // Add FXAA pass for better edge antialiasing
+            fxaaPass = new ShaderPass(FXAAShader);
+            fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+            fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+            composer.addPass(fxaaPass);
+            
+            // SSR will be added after model loads and Floor object is found
+            
+            // Add output pass for proper color space (this should be last)
+            const outputPass = new OutputPass();
+            composer.addPass(outputPass);
+            
+            console.log("Enhanced post-processing with FXAA antialiasing initialized");
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Disable zoom functionality
+            controls.enableZoom = false;
+            
+            // Disable mouse click camera movement
+            controls.enableRotate = false;
+            controls.enablePan = false;
+            
+            // Adjust orbital point up slightly and tilt camera up
+            controls.target.set(0, 8, 0); // Move orbital point up
+            camera.position.set(0, 5, 1); // Tilt camera up more
+            controls.update();
+            
+            // Store original camera target and position for reset functionality
+            originalCameraTarget = controls.target.clone();
+            originalCameraPosition = camera.position.clone();
+            
+            console.log("Controls created with basic limits");
+
+
+            // Add rim lighting from the front
+            const rimLight = new THREE.DirectionalLight(0xffffff, 2);
+            rimLight.position.set(0, 6, 30); // Far front for rim effect
+            rimLight.castShadow = false;
+            scene.add(rimLight);
+
+            const rimLight2 = new THREE.DirectionalLight(0xffffff, 2);
+            rimLight2.position.set(20, 6, 30); // Far front for rim effect
+            rimLight2.castShadow = false;
+            scene.add(rimLight2);
+            
+            const rimLight3 = new THREE.DirectionalLight(0xffffff, 2);
+            rimLight3.position.set(-20, 6, 30); // Far front for rim effect
+            rimLight3.castShadow = false;
+            scene.add(rimLight3);
+
+            const rimLight4 = new THREE.DirectionalLight(0xffffff, 2);
+            rimLight4.position.set(0, -40, 30); // Far front for rim effect
+            rimLight4.castShadow = false;
+            scene.add(rimLight4);
+
+            // Add ambient light for overall scene illumination
+            const ambientLight = new THREE.AmbientLight(0x404040, 6); // Soft white light with moderate intensity
+            scene.add(ambientLight);
+
+            console.log("Enhanced lighting with multiple front-facing lights and ambient light added");
+
+            // Raycaster for mouse interaction
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Mouse click event
+            window.addEventListener('click', onMouseClick, false);
+            
+            // Mouse move event for hover cursor
+            window.addEventListener('mousemove', onMouseMove, false);
+            
+            function onMouseMove(event) {
+                // Update mouse position for camera following (always track, even when popup is open)
+                mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Check if popup is open - if so, disable all hover effects
+                const popupCard = document.getElementById('popup-card');
+                if (popupCard.style.display === 'block') {
+                    document.body.style.cursor = 'default';
+                    return;
+                }
+                
+                mouse.x = mousePosition.x;
+                mouse.y = mousePosition.y;
+                
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Check for author objects
+                const authorIntersects = raycaster.intersectObjects(authorObjects, true);
+                
+                // Check for category objects
+                const categoryIntersects = raycaster.intersectObjects(categoriesObjects, true);
+                
+                // Check for author text objects
+                const authorTextIntersects = raycaster.intersectObjects(authorTextObjects, true);
+                
+                // Check for category title objects
+                const categoryTitleIntersects = raycaster.intersectObjects(categoriesTitleObjects, true);
+                
+                // Helper function to find category group from any object
+                function findCategoryGroupFromObject(object) {
+                    // Check each category group to see if this object belongs to it
+                    for (const [groupNum, group] of Object.entries(categoryGroups)) {
+                        if (group.category === object || 
+                            group.categoryTitle === object ||
+                            group.authors.includes(object) || 
+                            group.authorTexts.includes(object)) {
+                            return { groupNum, categoryObject: group.category };
+                        }
+                        
+                        // Also check parent objects for nested meshes
+                        let parent = object.parent;
+                        while (parent) {
+                            if (group.category === parent || 
+                                group.categoryTitle === parent ||
+                                group.authors.includes(parent) || 
+                                group.authorTexts.includes(parent)) {
+                                return { groupNum, categoryObject: group.category };
+                            }
+                            parent = parent.parent;
+                        }
+                    }
+                    return null;
+                }
+                
+                if (authorIntersects.length > 0) {
+                    // Hovering over an author object - show pointer cursor and apply category hover
+                    document.body.style.cursor = 'pointer';
+                    
+                    const authorObject = authorIntersects[0].object;
+                    let targetAuthor = authorObject;
+                    
+                    // Find parent author object if clicked on child
+                    let parent = authorObject.parent;
+                    while (parent && !parent.name.toLowerCase().includes('author')) {
+                        parent = parent.parent;
+                    }
+                    if (parent && parent.name.toLowerCase().includes('author')) {
+                        targetAuthor = parent;
+                    }
+                    
+                    const groupInfo = findCategoryGroupFromObject(targetAuthor);
+                    if (groupInfo && hoveredCategory !== groupInfo.categoryObject) {
+                        resetCategoryHover();
+                        if (lockedCategory !== groupInfo.groupNum) {
+                            applyCategoryHover(groupInfo.categoryObject);
+                        }
+                    }
+                } else if (categoryIntersects.length > 0 || authorTextIntersects.length > 0 || 
+                          categoryTitleIntersects.length > 0) {
+                    // Hovering over any group object - show pointer cursor and apply category hover
+                    document.body.style.cursor = 'pointer';
+                    
+                    let targetObject = null;
+                    if (categoryIntersects.length > 0) targetObject = categoryIntersects[0].object;
+                    else if (authorTextIntersects.length > 0) targetObject = authorTextIntersects[0].object;
+                    else if (categoryTitleIntersects.length > 0) targetObject = categoryTitleIntersects[0].object;
+                    
+                    if (targetObject) {
+                        const groupInfo = findCategoryGroupFromObject(targetObject);
+                        if (groupInfo && hoveredCategory !== groupInfo.categoryObject) {
+                            resetCategoryHover();
+                            if (lockedCategory !== groupInfo.groupNum) {
+                                applyCategoryHover(groupInfo.categoryObject);
+                            }
+                        }
+                    }
+                } else {
+                    // Not hovering over any interactive object - show default cursor
+                    document.body.style.cursor = 'default';
+                    resetCategoryHover();
+                }
+            }
+            
+            function applyCategoryHover(categoryObject) {
+                hoveredCategory = categoryObject;
+                
+                // Find which category group this belongs to
+                const categoryNum = Object.keys(categoryGroups).find(num => 
+                    categoryGroups[num].category === categoryObject
+                );
+                
+                if (!categoryNum) return;
+                
+                // Don't apply hover if this category is locked
+                if (lockedCategory === categoryNum) {
+                    hoveredCategory = null;
+                    return;
+                }
+                
+                const group = categoryGroups[categoryNum];
+                
+                // First reset all objects to their original rotations to prevent accumulation
+                resetGroupToOriginalRotations(categoryNum);
+                
+                // Calculate direction to camera
+                const categoryPosition = new THREE.Vector3();
+                categoryObject.getWorldPosition(categoryPosition);
+                
+                const cameraPosition = camera.position.clone();
+                const direction = cameraPosition.sub(categoryPosition).normalize();
+                
+                // Create rotation to face camera (Y-axis only) with reduced rotation
+                let targetYRotation = Math.atan2(direction.x, direction.z);
+                
+                // Normalize the angle to prevent over-rotation
+                while (targetYRotation > Math.PI) targetYRotation -= 2 * Math.PI;
+                while (targetYRotation < -Math.PI) targetYRotation += 2 * Math.PI;
+                
+                // Apply a reduction factor to prevent over-rotation
+                const originalY = group.originalRotations.category.y;
+                let rotationDifference = targetYRotation - originalY;
+                
+                // Normalize the difference
+                while (rotationDifference > Math.PI) rotationDifference -= 2 * Math.PI;
+                while (rotationDifference < -Math.PI) rotationDifference += 2 * Math.PI;
+                
+                // Reduce the rotation by 30% for hover (more subtle than click)
+                rotationDifference *= 0.7;
+                
+                // Calculate rotation difference (Y-axis only)
+                const rotationDiff = {
+                    x: 0, // No X rotation
+                    y: rotationDifference,
+                    z: 0  // No Z rotation
+                };
+                
+                // Animate rotation for entire group
+                animateCategoryGroupRotation(categoryNum, rotationDiff);
+            }
+            
+            function resetGroupToOriginalRotations(categoryNum) {
+                const group = categoryGroups[categoryNum];
+                if (!group) return;
+                
+                // Reset category
+                group.category.rotation.x = group.originalRotations.category.x;
+                group.category.rotation.y = group.originalRotations.category.y;
+                group.category.rotation.z = group.originalRotations.category.z;
+                
+                // Reset category title
+                if (group.categoryTitle) {
+                    group.categoryTitle.rotation.x = group.originalRotations.categoryTitle.x;
+                    group.categoryTitle.rotation.y = group.originalRotations.categoryTitle.y;
+                    group.categoryTitle.rotation.z = group.originalRotations.categoryTitle.z;
+                }
+                
+                // Reset authors
+                group.authors.forEach((author) => {
+                    const authorName = author.name;
+                    if (group.originalRotations[authorName]) {
+                        author.rotation.x = group.originalRotations[authorName].x;
+                        author.rotation.y = group.originalRotations[authorName].y;
+                        author.rotation.z = group.originalRotations[authorName].z;
+                    }
+                });
+                
+                // Reset author texts
+                group.authorTexts.forEach((authorText) => {
+                    const authorTextName = authorText.name;
+                    if (group.originalRotations[authorTextName]) {
+                        authorText.rotation.x = group.originalRotations[authorTextName].x;
+                        authorText.rotation.y = group.originalRotations[authorTextName].y;
+                        authorText.rotation.z = group.originalRotations[authorTextName].z;
+                    }
+                });
+            }
+            
+            function resetCategoryHover() {
+                if (hoveredCategory) {
+                    // Find which category group this belongs to
+                    const categoryNum = Object.keys(categoryGroups).find(num => 
+                        categoryGroups[num].category === hoveredCategory
+                    );
+                    
+                    // Only reset if this category is not locked
+                    if (categoryNum && lockedCategory !== categoryNum) {
+                        // Animate back to original rotations for entire group
+                        animateCategoryGroupRotation(categoryNum, { x: 0, y: 0, z: 0 }, true);
+                    }
+                    
+                    hoveredCategory = null;
+                }
+            }
+            
+            function animateCategoryGroupRotation(categoryNum, rotationDiff, resetToOriginal = false) {
+                const group = categoryGroups[categoryNum];
+                if (!group) return;
+                
+                // Store starting rotations for all objects in group
+                const startRotations = {};
+                
+                // Category
+                startRotations.category = {
+                    x: group.category.rotation.x,
+                    y: group.category.rotation.y,
+                    z: group.category.rotation.z
+                };
+                
+                // Text
+                if (group.text) {
+                    startRotations.text = {
+                        x: group.text.rotation.x,
+                        y: group.text.rotation.y,
+                        z: group.text.rotation.z
+                    };
+                }
+                
+                // Category Title
+                if (group.categoryTitle) {
+                    startRotations.categoryTitle = {
+                        x: group.categoryTitle.rotation.x,
+                        y: group.categoryTitle.rotation.y,
+                        z: group.categoryTitle.rotation.z
+                    };
+                }
+                
+                // Authors
+                group.authors.forEach((author, index) => {
+                    startRotations[`author${index}`] = {
+                        x: author.rotation.x,
+                        y: author.rotation.y,
+                        z: author.rotation.z
+                    };
+                });
+                
+                // Author Texts
+                group.authorTexts.forEach((authorText, index) => {
+                    startRotations[`authorText${index}`] = {
+                        x: authorText.rotation.x,
+                        y: authorText.rotation.y,
+                        z: authorText.rotation.z
+                    };
+                });
+                
+                const duration = 300; // 300ms animation
+                const startTime = Date.now();
+                
+                function animate() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Smooth easing
+                    const easeOut = 1 - Math.pow(1 - progress, 3);
+                    
+                    if (resetToOriginal) {
+                        // Reset to original rotations
+                        group.category.rotation.x = startRotations.category.x + (group.originalRotations.category.x - startRotations.category.x) * easeOut;
+                        group.category.rotation.y = startRotations.category.y + (group.originalRotations.category.y - startRotations.category.y) * easeOut;
+                        group.category.rotation.z = startRotations.category.z + (group.originalRotations.category.z - startRotations.category.z) * easeOut;
+                        
+                        if (group.text) {
+                            group.text.rotation.x = startRotations.text.x + (group.originalRotations.text.x - startRotations.text.x) * easeOut;
+                            group.text.rotation.y = startRotations.text.y + (group.originalRotations.text.y - startRotations.text.y) * easeOut;
+                            group.text.rotation.z = startRotations.text.z + (group.originalRotations.text.z - startRotations.text.z) * easeOut;
+                        }
+                        
+                        if (group.categoryTitle) {
+                            group.categoryTitle.rotation.x = startRotations.categoryTitle.x + (group.originalRotations.categoryTitle.x - startRotations.categoryTitle.x) * easeOut;
+                            group.categoryTitle.rotation.y = startRotations.categoryTitle.y + (group.originalRotations.categoryTitle.y - startRotations.categoryTitle.y) * easeOut;
+                            group.categoryTitle.rotation.z = startRotations.categoryTitle.z + (group.originalRotations.categoryTitle.z - startRotations.categoryTitle.z) * easeOut;
+                        }
+                        
+                        group.authors.forEach((author, index) => {
+                            const authorName = author.name;
+                            if (group.originalRotations[authorName]) {
+                                author.rotation.x = startRotations[`author${index}`].x + (group.originalRotations[authorName].x - startRotations[`author${index}`].x) * easeOut;
+                                author.rotation.y = startRotations[`author${index}`].y + (group.originalRotations[authorName].y - startRotations[`author${index}`].y) * easeOut;
+                                author.rotation.z = startRotations[`author${index}`].z + (group.originalRotations[authorName].z - startRotations[`author${index}`].z) * easeOut;
+                            }
+                        });
+                        
+                        group.authorTexts.forEach((authorText, index) => {
+                            const authorTextName = authorText.name;
+                            if (group.originalRotations[authorTextName]) {
+                                authorText.rotation.x = startRotations[`authorText${index}`].x + (group.originalRotations[authorTextName].x - startRotations[`authorText${index}`].x) * easeOut;
+                                authorText.rotation.y = startRotations[`authorText${index}`].y + (group.originalRotations[authorTextName].y - startRotations[`authorText${index}`].y) * easeOut;
+                                authorText.rotation.z = startRotations[`authorText${index}`].z + (group.originalRotations[authorTextName].z - startRotations[`authorText${index}`].z) * easeOut;
+                            }
+                        });
+                    } else {
+                        // Apply rotation difference to all objects using consistent starting rotations
+                        group.category.rotation.x = group.originalRotations.category.x + rotationDiff.x * easeOut;
+                        group.category.rotation.y = group.originalRotations.category.y + rotationDiff.y * easeOut;
+                        group.category.rotation.z = group.originalRotations.category.z + rotationDiff.z * easeOut;
+                        
+                        if (group.text) {
+                            group.text.rotation.x = group.originalRotations.text.x + rotationDiff.x * easeOut;
+                            group.text.rotation.y = group.originalRotations.text.y + rotationDiff.y * easeOut;
+                            group.text.rotation.z = group.originalRotations.text.z + rotationDiff.z * easeOut;
+                        }
+                        
+                        if (group.categoryTitle) {
+                            group.categoryTitle.rotation.x = group.originalRotations.categoryTitle.x + rotationDiff.x * easeOut;
+                            group.categoryTitle.rotation.y = group.originalRotations.categoryTitle.y + rotationDiff.y * easeOut;
+                            group.categoryTitle.rotation.z = group.originalRotations.categoryTitle.z + rotationDiff.z * easeOut;
+                        }
+                        
+                        group.authors.forEach((author, index) => {
+                            const authorName = author.name;
+                            if (group.originalRotations[authorName]) {
+                                author.rotation.x = group.originalRotations[authorName].x + rotationDiff.x * easeOut;
+                                author.rotation.y = group.originalRotations[authorName].y + rotationDiff.y * easeOut;
+                                author.rotation.z = group.originalRotations[authorName].z + rotationDiff.z * easeOut;
+                            }
+                        });
+                        
+                        group.authorTexts.forEach((authorText, index) => {
+                            const authorTextName = authorText.name;
+                            if (group.originalRotations[authorTextName]) {
+                                authorText.rotation.x = group.originalRotations[authorTextName].x + rotationDiff.x * easeOut;
+                                authorText.rotation.y = group.originalRotations[authorTextName].y + rotationDiff.y * easeOut;
+                                authorText.rotation.z = group.originalRotations[authorTextName].z + rotationDiff.z * easeOut;
+                            }
+                        });
+                    }
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    }
+                }
+                
+                animate();
+            }
+            
+            function onMouseClick(event) {
+                // Check if popup is open - if so, only allow closing it
+                const popupElement = document.getElementById('popup-card');
+                if (popupElement.style.display === 'block') {
+                    // Only close popup if clicking outside of it
+                    const popupRect = popupElement.getBoundingClientRect();
+                    const clickX = event.clientX;
+                    const clickY = event.clientY;
+                    
+                    if (clickX < popupRect.left || clickX > popupRect.right || 
+                        clickY < popupRect.top || clickY > popupRect.bottom) {
+                        closePopup();
+                    }
+                    return;
+                }
+                
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Check for author objects first
+                const authorIntersects = raycaster.intersectObjects(authorObjects, true);
+                
+                if (authorIntersects.length > 0) {
+                    const clickedObject = authorIntersects[0].object;
+                    let authorName = clickedObject.name;
+                    let authorObject = clickedObject;
+                    
+                    // Find parent object name if clicked on child
+                    let parent = clickedObject.parent;
+                    while (parent && !parent.name.toLowerCase().includes('author')) {
+                        parent = parent.parent;
+                    }
+                    if (parent && parent.name.toLowerCase().includes('author')) {
+                        authorName = parent.name;
+                        authorObject = parent;
+                    }
+                    
+                    showPopup(authorName, authorObject);
+                    return;
+                }
+                
+                // Check for category objects
+                const categoryIntersects = raycaster.intersectObjects(categoriesObjects, true);
+                
+                if (categoryIntersects.length > 0) {
+                    const clickedObject = categoryIntersects[0].object;
+                    let categoryObject = clickedObject;
+                    
+                    // Find parent category object
+                    let parent = clickedObject.parent;
+                    while (parent && !parent.name.includes('Categories')) {
+                        parent = parent.parent;
+                    }
+                    if (parent && parent.name.includes('Categories')) {
+                        categoryObject = parent;
+                    }
+                    
+                    // Find which category group this belongs to
+                    const categoryNum = Object.keys(categoryGroups).find(num => 
+                        categoryGroups[num].category === categoryObject
+                    );
+                    
+                    if (categoryNum) {
+                        // Reset any hover effects first to prevent accumulation
+                        resetCategoryHover();
+                        
+                        // Reset any previously locked category
+                        if (lockedCategory && lockedCategory !== categoryNum) {
+                            resetCategoryToOriginal(lockedCategory);
+                        }
+                        
+                        // Lock this category facing the camera (without hover interference)
+                        lockCategoryFacingCamera(categoryNum);
+                        
+                        // Tilt camera towards the category
+                        tiltCameraToCategory(categoryObject);
+                    }
+                    return;
+                }
+                
+                // Clicked elsewhere - reset everything and return camera to original view
+                const popup = document.getElementById('popup-card');
+                if (popup.style.display === 'block') {
+                    closePopup();
+                }
+                
+                // Reset any locked category when clicking elsewhere
+                if (lockedCategory) {
+                    resetCategoryToOriginal(lockedCategory);
+                    lockedCategory = null;
+                
+                    // Simply reset camera to default view without tilt animation
+                    resetCameraToDefault();
+                } else {
+                    // Reset camera view to original target (for other cases)
+                resetCameraView();
+                }
+            }
+            
+            function tiltCameraToCategory(categoryObject) {
+                // Disable mouse following and mark as transitioning
+                mouseFollowEnabled = false;
+                cameraTransitioning = true;
+                
+                // Get category world position
+                const categoryPosition = new THREE.Vector3();
+                categoryObject.getWorldPosition(categoryPosition);
+                
+                // Store current camera position and target
+                const currentPosition = camera.position.clone();
+                const currentTarget = controls.target.clone();
+                
+                // Calculate new target for camera to look at
+                const newTarget = categoryPosition.clone();
+                
+                // Calculate zoom-in position (move camera closer to the target)
+                const direction = currentPosition.clone().sub(newTarget).normalize();
+                const zoomDistance = currentPosition.distanceTo(newTarget) * 0.7; // Zoom in to 70% of original distance
+                const newPosition = newTarget.clone().add(direction.multiplyScalar(zoomDistance));
+                
+                // Animate camera tilt and zoom
+                const duration = 1000; // 1 second animation
+                const startTime = Date.now();
+                
+                function animateTiltAndZoom() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Smooth easing
+                    const easeInOut = progress < 0.5 
+                        ? 2 * progress * progress 
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    
+                    // Interpolate target position
+                    controls.target.lerpVectors(currentTarget, newTarget, easeInOut);
+                    
+                    // Interpolate camera position (zoom in)
+                    camera.position.lerpVectors(currentPosition, newPosition, easeInOut);
+                    
+                    controls.update();
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animateTiltAndZoom);
+                    } else {
+                        // Tilt complete - camera is now locked to category
+                        cameraTransitioning = false;
+                        console.log(`Camera tilted and zoomed to focus on: ${categoryObject.name}`);
+                    }
+                }
+                
+                animateTiltAndZoom();
+            }
+            
+            function lockCategoryFacingCamera(categoryNum) {
+                const group = categoryGroups[categoryNum];
+                if (!group) return;
+                
+                // First reset to original rotations to avoid accumulation
+                resetGroupToOriginalRotations(categoryNum);
+                
+                // Calculate direction to camera from original position
+                const categoryPosition = new THREE.Vector3();
+                group.category.getWorldPosition(categoryPosition);
+                
+                const cameraPosition = camera.position.clone();
+                const direction = cameraPosition.sub(categoryPosition).normalize();
+                
+                // Create rotation to face camera (Y-axis only) with reduced rotation
+                let targetYRotation = Math.atan2(direction.x, direction.z);
+                
+                // Normalize the angle to prevent over-rotation
+                while (targetYRotation > Math.PI) targetYRotation -= 2 * Math.PI;
+                while (targetYRotation < -Math.PI) targetYRotation += 2 * Math.PI;
+                
+                // Apply a reduction factor to prevent over-rotation
+                const originalY = group.originalRotations.category.y;
+                let rotationDifference = targetYRotation - originalY;
+                
+                // Normalize the difference
+                while (rotationDifference > Math.PI) rotationDifference -= 2 * Math.PI;
+                while (rotationDifference < -Math.PI) rotationDifference += 2 * Math.PI;
+                
+                // Reduce the rotation by 20% to prevent over-rotation
+                rotationDifference *= 0.8;
+                
+                // Calculate final rotation difference (Y-axis only)
+                const rotationDiff = {
+                    x: 0,
+                    y: rotationDifference,
+                    z: 0
+                };
+                
+                // Apply rotation to entire group and lock it
+                animateCategoryGroupRotation(categoryNum, rotationDiff);
+                lockedCategory = categoryNum;
+                
+                // Disable mouse following when a category is locked
+                mouseFollowEnabled = false;
+                
+                console.log(`Category ${categoryNum} locked facing camera with reduced rotation`);
+            }
+            
+            function resetCategoryToOriginal(categoryNum) {
+                const group = categoryGroups[categoryNum];
+                if (!group) return;
+                
+                // Animate back to original rotations for entire group
+                animateCategoryGroupRotation(categoryNum, { x: 0, y: 0, z: 0 }, true);
+                
+                console.log(`Category ${categoryNum} reset to original rotation`);
+            }
+            
+            function resetCameraView() {
+                if (!originalCameraTarget || !originalCameraPosition) return;
+                
+                // Disable mouse following and mark as transitioning
+                mouseFollowEnabled = false;
+                cameraTransitioning = true;
+                
+                // Store current target and position
+                const currentTarget = controls.target.clone();
+                const currentPosition = camera.position.clone();
+                
+                // Animate camera target and position back to original
+                const duration = 1000; // 1 second animation
+                const startTime = Date.now();
+                
+                function animateReset() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Smooth easing
+                    const easeInOut = progress < 0.5 
+                        ? 2 * progress * progress 
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    
+                    // Interpolate target position back to original
+                    controls.target.lerpVectors(currentTarget, originalCameraTarget, easeInOut);
+                    
+                    // Interpolate camera position back to original (zoom out)
+                    camera.position.lerpVectors(currentPosition, originalCameraPosition, easeInOut);
+                    
+                    controls.update();
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animateReset);
+                    } else {
+                        // Reset complete - prepare for smooth transition to mouse following
+                        targetCameraPosition = originalCameraPosition.clone();
+                        cameraTransitioning = false;
+                        
+                        // Start smooth transition to mouse following after a brief delay
+                        setTimeout(() => {
+                            if (cameraAnimationComplete && !lockedCategory) {
+                                // Ensure camera is exactly at original position before transitioning
+                                camera.position.copy(originalCameraPosition);
+                                controls.target.copy(originalCameraTarget);
+                                controls.update();
+                                
+                                smoothTransitionToMouseFollow();
+                            }
+                        }, 150); // Slightly longer delay to ensure reset is complete
+                        
+                        console.log("Camera view and zoom reset to original position, preparing for mouse following");
+                    }
+                }
+                
+                animateReset();
+            }
+
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Update performance stats
+                updatePerformanceStats();
+                
+                // Update camera following if enabled and not transitioning
+                if (cameraAnimationComplete && mouseFollowEnabled && !lockedCategory && !cameraTransitioning) {
+                    updateCameraFollowMouse();
+                }
+                
+                controls.update();
+                composer.render(); // Use composer instead of renderer.render
+            }
+            
+            // Start animation
+            animate();
+            console.log("Animation started");
+
+            // Initialize stats display
+            updateStatsDisplay();
+
+            // Load text and links configuration
+            loadTextAndLinksConfig();
+            
+            // Load author textures
+            loadAuthorTextures();
+            
+            // Load the 3D model directly
+            loadModel();
+            
+            function loadAuthorTextures() {
+                performanceStats.textureLoadStart = performance.now();
+                const textureLoader = new THREE.TextureLoader();
+                
+                // Load textures for Author1 through Author8
+                for (let i = 1; i <= 8; i++) {
+                    textureLoader.load(
+                        `Authors webp/Author${i}.webp`,
+                    function(texture) {
+                            // Fix upside-down texture by flipping Y
+                            texture.flipY = false;
+                            texture.wrapS = THREE.ClampToEdgeWrapping;
+                            texture.wrapT = THREE.ClampToEdgeWrapping;
+                            
+                            // Set proper color space for accurate color reproduction
+                            texture.colorSpace = THREE.SRGBColorSpace;
+                            
+                            authorTextures[i] = texture;
+                            texturesLoaded++;
+                            console.log(`Author${i} texture loaded successfully`);
+                            
+                            // Check if all textures are loaded and model is loaded
+                            if (texturesLoaded === 8 && modelLoaded) {
+                                performanceStats.textureLoadEnd = performance.now();
+                                applyTexturesToAuthors();
+                            }
+                    },
+                    function(xhr) {
+                            // Progress callback
+                    },
+                    function(error) {
+                            console.error(`Error loading Author${i} texture:`, error);
+                            texturesLoaded++; // Count failed loads too
+                            if (texturesLoaded === 8 && modelLoaded) {
+                                performanceStats.textureLoadEnd = performance.now();
+                                applyTexturesToAuthors();
+                            }
+                        }
+                    );
+                }
+            }
+            
+            function createCategoryGroups() {
+                console.log("Creating category groups...");
+                
+                // Helper function to extract number from object name
+                function getObjectNumber(objectName) {
+                    const match = objectName.match(/(\d+)$/);
+                    return match ? parseInt(match[1]) : null;
+                }
+                
+                // Helper function to determine which category group an object belongs to based on ending number
+                function getCategoryGroupForNumber(number) {
+                    if (number === 1 || number === 2) return 1;
+                    if (number === 3 || number === 4) return 2;
+                    if (number === 5 || number === 6) return 3;
+                    if (number === 7 || number === 8) return 4;
+                    return null;
+                }
+                
+                // Initialize category groups
+                for (let i = 1; i <= 4; i++) {
+                    const categoryObject = categoriesObjects.find(cat => 
+                        cat.name.includes(`Categories${i}`)
+                    );
+                    
+                    if (categoryObject) {
+                        categoryGroups[i] = {
+                            category: categoryObject,
+                            categoryTitle: null,
+                            authors: [],
+                            authorTexts: [],
+                            originalRotations: {} // Store original rotations for reset
+                        };
+                        
+                        // Store category's original rotation
+                        categoryGroups[i].originalRotations.category = {
+                            x: categoryObject.rotation.x,
+                            y: categoryObject.rotation.y,
+                            z: categoryObject.rotation.z
+                        };
+                    }
+                }
+                
+
+                // Group category title objects (direct 1-to-1 mapping)
+                categoriesTitleObjects.forEach(categoryTitleObject => {
+                    const objectNumber = getObjectNumber(categoryTitleObject.name);
+                    
+                    // CategoriesTitle objects map directly to their category number
+                    if (objectNumber && categoryGroups[objectNumber]) {
+                        categoryGroups[objectNumber].categoryTitle = categoryTitleObject;
+                        categoryGroups[objectNumber].originalRotations.categoryTitle = {
+                            x: categoryTitleObject.rotation.x,
+                            y: categoryTitleObject.rotation.y,
+                            z: categoryTitleObject.rotation.z
+                        };
+                        console.log(`Grouped ${categoryTitleObject.name} (number ${objectNumber}) with Categories${objectNumber}`);
+                    }
+                });
+                
+                // Group author objects
+                authorObjects.forEach(authorObject => {
+                    const objectNumber = getObjectNumber(authorObject.name);
+                    const categoryGroup = getCategoryGroupForNumber(objectNumber);
+                    
+                    if (categoryGroup && categoryGroups[categoryGroup]) {
+                        categoryGroups[categoryGroup].authors.push(authorObject);
+                        categoryGroups[categoryGroup].originalRotations[authorObject.name] = {
+                                    x: authorObject.rotation.x,
+                                    y: authorObject.rotation.y,
+                                    z: authorObject.rotation.z
+                                };
+                        console.log(`Grouped ${authorObject.name} (ending with ${objectNumber}) with Categories${categoryGroup}`);
+                    }
+                });
+                
+                // Group author text objects
+                authorTextObjects.forEach(authorTextObject => {
+                    const objectNumber = getObjectNumber(authorTextObject.name);
+                    const categoryGroup = getCategoryGroupForNumber(objectNumber);
+                    
+                    if (categoryGroup && categoryGroups[categoryGroup]) {
+                        categoryGroups[categoryGroup].authorTexts.push(authorTextObject);
+                        categoryGroups[categoryGroup].originalRotations[authorTextObject.name] = {
+                            x: authorTextObject.rotation.x,
+                            y: authorTextObject.rotation.y,
+                            z: authorTextObject.rotation.z
+                        };
+                        console.log(`Grouped ${authorTextObject.name} (ending with ${objectNumber}) with Categories${categoryGroup}`);
+                    }
+                });
+                
+                // Log final group summary
+                Object.keys(categoryGroups).forEach(categoryNum => {
+                    const group = categoryGroups[categoryNum];
+                    console.log(`Category group ${categoryNum} created with:`);
+                    console.log(`  - ${group.authors.length} authors: ${group.authors.map(a => a.name).join(', ')}`);
+                    console.log(`  - ${group.authorTexts.length} author texts: ${group.authorTexts.map(a => a.name).join(', ')}`);
+                    console.log(`  - Category title: ${group.categoryTitle ? group.categoryTitle.name : 'not found'}`);
+                });
+            }
+
+            function applyTexturesToAuthors() {
+                console.log("Applying textures to author objects...");
+                authorObjects.forEach(authorObject => {
+                    const authorNumber = authorObject.name.replace(/\D/g, '');
+                    if (authorNumber && authorTextures[authorNumber]) {
+                        // Clone the texture to modify it independently
+                        const enhancedTexture = authorTextures[authorNumber].clone();
+                        enhancedTexture.needsUpdate = true;
+                        
+                        // Create dedicated unlit material for this author with enhanced saturation and lower exposure
+                        const authorMaterial = new THREE.MeshBasicMaterial({
+                            map: enhancedTexture, // Use enhanced texture
+                            transparent: false,
+                            opacity: 1.0,
+                            side: THREE.FrontSide,
+                            toneMapped: true, // Enable tone mapping for exposure control
+                        });
+                        
+                        // Apply the dedicated material to all meshes in the author object
+                        authorObject.traverse((child) => {
+                            if (child.isMesh) {
+                                const materialClone = authorMaterial.clone();
+                                
+
+                                
+                                // The texture will be affected by tone mapping and exposure settings
+                                child.material = materialClone;
+                                child.material.needsUpdate = true;
+                            }
+                        });
+                        console.log(`Applied Author${authorNumber} enhanced material with increased saturation and lower exposure`);
+                    }
+                });
+            }
+            
+            function applyTextTexturesToAuthorText() {
+                console.log("Applying text textures to AuthorText objects...");
+                authorTextObjects.forEach(authorTextObject => {
+                    const authorNumber = authorTextObject.name.replace(/\D/g, '');
+                    if (authorNumber && authorTextTextures[authorNumber]) {
+                        // Create material with text as opacity map
+                        const textMaterial = new THREE.MeshBasicMaterial({
+                            color: 0xffffff, // White base color
+                            alphaMap: authorTextTextures[authorNumber], // Use text texture as opacity
+                            transparent: true,
+                            opacity: 0.9, // Slightly reduce opacity for better blending
+                            side: THREE.DoubleSide,
+                            toneMapped: false, // Prevent tone mapping
+                            depthWrite: false, // Prevent z-fighting
+                            alphaTest: 0.1 // Improve edge quality
+                        });
+                        
+                        // Apply the material to all meshes in the AuthorText object
+                        authorTextObject.traverse((child) => {
+                            if (child.isMesh) {
+                                child.material = textMaterial.clone();
+                                child.material.needsUpdate = true;
+                                
+                                // Ensure proper rendering order
+                                child.renderOrder = 1;
+                            }
+                        });
+                        console.log(`Applied text texture to AuthorText${authorNumber}`);
+                    }
+                });
+            }
+            
+            function applyTextTexturesToCategoriesTitle() {
+                console.log("Applying text textures to CategoriesTitle objects...");
+                categoriesTitleObjects.forEach(categoryTitleObject => {
+                    const categoryNumber = categoryTitleObject.name.replace(/\D/g, '');
+                    if (categoryNumber && categoryTitleTextures[categoryNumber]) {
+                        // Create material with text as opacity map
+                        const textMaterial = new THREE.MeshBasicMaterial({
+                            color: 0xffffff, // White base color
+                            alphaMap: categoryTitleTextures[categoryNumber], // Use text texture as opacity
+                            transparent: true,
+                            opacity: 0.9, // Slightly reduce opacity for better blending
+                            side: THREE.DoubleSide,
+                            toneMapped: false, // Prevent tone mapping
+                            depthWrite: false, // Prevent z-fighting
+                            alphaTest: 0.1 // Improve edge quality
+                        });
+                        
+                        // Apply the material to all meshes in the CategoriesTitle object
+                        categoryTitleObject.traverse((child) => {
+                            if (child.isMesh) {
+                                child.material = textMaterial.clone();
+                                child.material.needsUpdate = true;
+                                
+                                // Ensure proper rendering order
+                                child.renderOrder = 1;
+                            }
+                        });
+                        console.log(`Applied text texture to CategoriesTitle${categoryNumber}`);
+                    }
+                });
+            }
+
+            function loadModel() {
+                console.log("Starting to load GLB model...");
+                performanceStats.modelLoadStart = performance.now();
+                const loader = new GLTFLoader();
+                loader.load(
+                    'Stage.glb',
+                    function(gltf) {
+                        performanceStats.modelLoadEnd = performance.now();
+                        console.log("Model loaded successfully");
+                        const model = gltf.scene;
+                        
+                        // Center the model
+                        const box = new THREE.Box3().setFromObject(model);
+                        const center = box.getCenter(new THREE.Vector3());
+                        model.position.sub(center);
+                        model.position.y = 0;
+                        
+                        // Convert all materials to MeshPhysicalMaterial and find special objects
+                        model.traverse((child) => {
+                            // Log all object names for debugging
+                            if (child.name && child.name.trim() !== '') {
+                                console.log("Found object:", child.name, "Type:", child.type);
+                            }
+                            
+                            // Disable shadows for all meshes
+                            if (child.isMesh) {
+                                child.castShadow = false;
+                                child.receiveShadow = false;
+                            }
+                            
+                            // Convert materials to MeshPhysicalMaterial if not already
+                            if (child.isMesh && child.material) {
+                                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                                
+                                materials.forEach((mat, index) => {
+                                    if (!(mat instanceof THREE.MeshPhysicalMaterial)) {
+                                        // Create new MeshPhysicalMaterial preserving original properties
+                                        const newMaterial = new THREE.MeshPhysicalMaterial({
+                                            color: mat.color || new THREE.Color(0xffffff),
+                                            map: mat.map || null,
+                                            normalMap: mat.normalMap || null,
+                                            roughnessMap: mat.roughnessMap || null,
+                                            metalnessMap: mat.metalnessMap || null,
+                                            emissive: mat.emissive || new THREE.Color(0x000000),
+                                            emissiveMap: mat.emissiveMap || null,
+                                            transparent: mat.transparent || false,
+                                            opacity: mat.opacity !== undefined ? mat.opacity : 1.0,
+                                            alphaMap: mat.alphaMap || null,
+                                            side: mat.side !== undefined ? mat.side : THREE.FrontSide,
+                                            roughness: mat.roughness !== undefined ? mat.roughness : 0.5,
+                                            metalness: mat.metalness !== undefined ? mat.metalness : 0.0,
+                                            envMapIntensity: 1.0,
+                                            clearcoat: 0,
+                                            transmission: 0,
+                                            ior: 1.5
+                                        });
+                                        
+                                        // Ensure proper color space for all texture maps
+                                        if (newMaterial.map) newMaterial.map.colorSpace = THREE.SRGBColorSpace;
+                                        if (newMaterial.emissiveMap) newMaterial.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+                                        
+                                        if (Array.isArray(child.material)) {
+                                            child.material[index] = newMaterial;
+                                        } else {
+                                            child.material = newMaterial;
+                                        }
+                                        
+                                        console.log("Converted material to MeshPhysicalMaterial for:", child.name);
+                                    }
+                                });
+                                
+                                // Special material treatments for specific objects
+                                // Debug Text object name
+                                if (child.name && child.name.toLowerCase().includes('text')) {
+                                    console.log("Text object found with exact name: '" + child.name + "' (length: " + child.name.length + ")");
+                                }
+                                
+                                if (child.name === 'Floor') {
+                                    // Store reference to Floor object for SSR
+                                    floorObject = child;
+                                    
+                                    // Replace with completely new MeshStandardMaterial
+                                    const newFloorMaterial = new THREE.MeshStandardMaterial({
+                                        color: 0x000000,
+                                        metalness: 0,
+                                        roughness: 1,
+                                        envMapIntensity: 0
+                                    });
+                                    
+                                    // Apply new material to all floor meshes
+                                    child.traverse((floorChild) => {
+                                        if (floorChild.isMesh) {
+                                            floorChild.material = newFloorMaterial.clone();
+                                            console.log("Replaced with completely new MeshStandardMaterial for:", floorChild.name);
+                                        }
+                                    });
+                                }
+                                else if (child.name && child.name.trim().toLowerCase() === 'text') {
+                                    // Text is a group, apply material to all child meshes
+                                    console.log("Found Text group, applying materials to child meshes");
+                                    console.log("Text group type:", child.type);
+                                    console.log("Text group children count:", child.children.length);
+                                    
+                                    child.traverse((textChild) => {
+                                        console.log("Text child:", textChild.name, "Type:", textChild.type, "IsMesh:", textChild.isMesh, "HasMaterial:", !!textChild.material);
+                                        
+                                        if (textChild.isMesh && textChild.material) {
+                                            const textMaterials = Array.isArray(textChild.material) ? textChild.material : [textChild.material];
+                                            textMaterials.forEach((mat) => {
+                                                mat.color.set(0xffffff); // White
+                                                mat.emissive.set(0xffffff); // White
+                                                mat.emissiveIntensity = 0;
+                                                mat.metalness = 0; // Non-metallic
+                                                mat.roughness = 1; // Slightly rough for readability
+                                                console.log("Applied white material to Text mesh:", textChild.name);
+                                            });
+                                        }
+                                    });
+                                }
+                                else if (child.name === 'Stage') {
+                                    // Make Stage emissive using original texture as emissive map
+                                    const stageMaterials = Array.isArray(child.material) ? child.material : [child.material];
+                                    stageMaterials.forEach((mat) => {
+                                        // Use the original texture (diffuse map) as emissive map
+                                        if (mat.map) {
+                                            mat.emissiveMap = mat.map.clone();
+                                            mat.emissive.set(0xffffff); // White to show the texture properly
+                                            mat.emissiveIntensity = 2; // Reduced from 5 for better balance
+                                        } else {
+                                            mat.emissive.set(0x2a2a4a); // Fallback blue-ish emissive glow
+                                            mat.emissiveIntensity = 5;
+                                        }
+                                        mat.metalness = 0;
+                                        mat.roughness = 1;
+                                        console.log("Applied emissive material with texture map to Stage");
+                                    });
+                                }
+
+                            }
+                            
+                            if (child.name.toLowerCase().includes('author')) {
+                                if (child.name.toLowerCase().includes('authortext')) {
+                                    authorTextObjects.push(child);
+                                    console.log("Found AuthorText object:", child.name);
+                                } else {
+                                authorObjects.push(child);
+                                console.log("Found Author object:", child.name);
+                                
+
+                                }
+                            }
+                            
+                            if (child.name.toLowerCase().includes('categoriestitle')) {
+                                categoriesTitleObjects.push(child);
+                                console.log("Found CategoriesTitle object:", child.name);
+                            }
+                            
+                            if (child.name.includes('Categories')) {
+                                categoriesObjects.push(child);
+                                console.log("Found Categories object:", child.name);
+                                
+                                // Apply enhanced glass material with optimal transmission and black tint
+                                const glassMaterial = new THREE.MeshPhysicalMaterial({
+                                    color: 0x1a1a1a, // Almost black tint instead of white
+                                    metalness: 0.1,
+                                    roughness: 0.1, // Smoother surface
+                                    transmission: 1, // Full transmission
+                                    transparent: true,
+                                    opacity: 0.7,
+                                    ior: 1.42, // Glass IOR
+                                    thickness: 2, // Increased thickness for better transmission
+                                    dispersion: 5.0, // Maximum dispersion for rainbow effect
+                                    clearcoat: 0.5, // Small amount for surface reflection
+                                    clearcoatRoughness: 0.02,
+                                    envMapIntensity: 0.2, // Minimal environment reflections
+                                    reflectivity: 0.25, // Reduced reflectivity
+                                    side: THREE.DoubleSide, // Render both sides for proper transmission
+                                    attenuationDistance: 2, // Slightly reduced for more visible tint
+                                    attenuationColor: new THREE.Color(0x0a0a0a) // Dark gray for subtle black tinting
+                                });
+                                
+                                // Apply to all meshes in the Categories object
+                                child.traverse((mesh) => {
+                                    if (mesh.isMesh) {
+                                        mesh.material = glassMaterial.clone();
+                                        console.log("Applied tinted glass material to mesh:", mesh.name);
+                                    }
+                                });
+                            }
+                        });
+                        
+                        scene.add(model);
+                        console.log("Model added to scene");
+                        
+                        // Count triangles for performance stats
+                        performanceStats.triangleCount = countTriangles(model);
+                        console.log(`Model triangle count: ${performanceStats.triangleCount.toLocaleString()}`);
+                        
+                        // Create category groups
+                        createCategoryGroups();
+                        
+                        // Set model loaded flag and apply textures if ready
+                        modelLoaded = true;
+                        if (texturesLoaded === 8) {
+                            applyTexturesToAuthors();
+                        }
+                        
+                        // Apply text textures to AuthorText and CategoriesTitle objects
+                        applyTextTexturesToAuthorText();
+                        applyTextTexturesToCategoriesTitle();
+                        
+                        // Add very subtle and realistic SSR
+                        console.log("Adding very subtle and realistic SSR");
+                        
+                        ssrPass = new SSRPass({
+                            renderer,
+                            scene,
+                            camera,
+                            width: window.innerWidth,
+                            height: window.innerHeight,
+                            selects: null,
+                            
+                            // Optimized performance settings
+                            steps: 16,
+                            refineSteps: 2,
+                            rayStep: 0.3,
+                            thickness: 0.2,
+                            
+                            // Optimized distance settings
+                            maxDistance: 60,
+                            fade: 15,
+                            
+                            // Material properties
+                            ior: 1.15,
+                            maxRoughness: 0.9,
+                            
+                            // Edge detection
+                            normalEdgeThreshold: 0.3,
+                            depthEdgeThreshold: 0.3,
+                            roughnessEdgeThreshold: 0.3,
+                            
+                            // Depth handling
+                            minDepthThreshold: 0.95,
+                            maxDepthThreshold: 1.02,
+                            maxDepthDifference: 4,
+                            
+                            // Temporal stability
+                            temporalResolve: true,
+                            temporalResolveMix: 0.85,
+                            temporalResolveCorrectionMix: 0.25,
+                            
+                            // Blur settings
+                            blur: true,
+                            blurMix: 0.7,
+                            blurKernelSize: 8,
+                            blurSharpness: 0.7,
+                            
+                            // Quality settings
+                            spp: 2,
+                            resolutionScale: 0.8,
+                            
+                            // Features
+                            bouncing: false,
+                            missedRays: false,
+                            infiniteThick: false,
+                            
+                            // Surface mapping
+                            useNormalMap: true,
+                            useRoughnessMap: false,
+                            
+                            // Blending
+                            intensity: 0.3,
+                            opacity: 0.2,
+                            blend: 0.4,
+                            
+                            // Physics
+                            fresnel: true,
+                            distanceAttenuation: true
+                        });
+                        
+                        // Insert SSR pass before bloom pass
+                        composer.insertPass(ssrPass, 1);
+                        
+                        // Force SSR update
+                        ssrPass.needsUpdate = true;
+                        console.log("Very subtle and realistic SSR enabled");
+                        
+                        // Adjust camera to fit the entire model
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const fov = camera.fov * (Math.PI / 180);
+                        let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
+                        
+                        cameraDistance *= 0.07;
+                        
+                        // Store final camera position
+                        const finalCameraPosition = new THREE.Vector3(0, 5, cameraDistance);
+                        
+                        // Set initial camera position (much further back for longer animation)
+                        const initialCameraPosition = new THREE.Vector3(0, 5, cameraDistance * 4.5);
+                        camera.position.copy(initialCameraPosition);
+                        controls.update();
+                        
+                        // Animate camera to final position
+                        const animationDuration = 4500; // Extended to 4.5 seconds
+                        const startTime = Date.now();
+                        
+                        function animateCamera() {
+                            const elapsed = Date.now() - startTime;
+                            const progress = Math.min(elapsed / animationDuration, 1);
+                            
+                            // Smooth easing function (ease-out)
+                            const easeOut = 1 - Math.pow(1 - progress, 3);
+                            
+                            // Interpolate camera position
+                            camera.position.lerpVectors(initialCameraPosition, finalCameraPosition, easeOut);
+                            controls.update();
+                            
+                            if (progress < 1) {
+                                requestAnimationFrame(animateCamera);
+                            } else {
+                                // Animation complete - store final camera position
+                                originalCameraPosition = camera.position.clone(); // Update stored position after animation
+                                targetCameraPosition = originalCameraPosition.clone(); // Initialize target position
+                                
+                                // Enable camera animation complete flag and mouse following
+                                cameraAnimationComplete = true;
+                                mouseFollowEnabled = true;
+                                
+                                console.log("Camera animation complete, final position stored, and mouse following enabled");
+                            }
+                        }
+                        
+                        // Start camera animation
+                        animateCamera();
+                        
+                        console.log("Camera animation started");
+                    },
+                    function(xhr) {
+                        if (xhr.lengthComputable) {
+                            const progress = (xhr.loaded / xhr.total) * 100;
+                            console.log(`Model loading: ${Math.round(progress)}%`);
+                        }
+                    },
+                    function(error) {
+                        console.error('Error loading model:', error);
+                    }
+                );
+            }
+
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                
+                // Update pixel ratio
+                const newPixelRatio = Math.min(window.devicePixelRatio, 3);
+                renderer.setPixelRatio(newPixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight); // Also resize composer
+                
+                // Update FXAA resolution uniforms
+                if (fxaaPass) {
+                    fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * newPixelRatio);
+                    fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * newPixelRatio);
+                }
+                
+                // Update SSR pass dimensions
+                if (ssrPass) {
+                    ssrPass.setSize(window.innerWidth, window.innerHeight);
+                }
+            });
+            
+        } catch (error) {
+            console.error("Error:", error);
+            document.body.innerHTML = `<div style="color: white; padding: 20px; font-family: Arial;">Error: ${error.message}</div>`;
+        }
+    </script>
+</body>
+</html> 

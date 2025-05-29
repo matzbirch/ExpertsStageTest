@@ -741,10 +741,15 @@
         window.closePopup = function() {
             document.getElementById('popup-card').style.display = 'none';
             
-            // Re-enable camera controls and smoothly transition to mouse following (if no category is locked)
+            // Re-enable camera controls without resetting camera position
             controls.enabled = true;
-            if (cameraAnimationComplete && !lockedCategory) {
-                smoothTransitionToMouseFollow();
+            
+            // Resume appropriate camera control based on device type
+            if (isMobile && touchEnabled) {
+                // Touch controls will resume automatically
+            } else if (cameraAnimationComplete && !lockedCategory) {
+                // Resume mouse following for desktop
+                mouseFollowEnabled = true;
             }
         }
         
@@ -1439,9 +1444,15 @@
                 // Calculate new target for camera to look at
                 const newTarget = categoryPosition.clone();
                 
-                // Calculate zoom-in position (move camera closer to the target)
+                // Calculate zoom-in position with different zoom levels for mobile vs desktop
                 const direction = currentPosition.clone().sub(newTarget).normalize();
-                const zoomDistance = currentPosition.distanceTo(newTarget) * 0.7; // Zoom in to 70% of original distance
+                let zoomFactor;
+                if (isMobile) {
+                    zoomFactor = 0.5; // Zoom in more on mobile (50% of original distance)
+                } else {
+                    zoomFactor = 0.7; // Original zoom for desktop (70% of original distance)
+                }
+                const zoomDistance = currentPosition.distanceTo(newTarget) * zoomFactor;
                 const newPosition = newTarget.clone().add(direction.multiplyScalar(zoomDistance));
                 
                 // Animate camera tilt and zoom
@@ -1571,23 +1582,33 @@
                     if (progress < 1) {
                         requestAnimationFrame(animateReset);
                     } else {
-                        // Reset complete - prepare for smooth transition to mouse following
-                        targetCameraPosition = originalCameraPosition.clone();
+                        // Reset complete - handle differently for mobile vs desktop
                         cameraTransitioning = false;
                         
-                        // Start smooth transition to mouse following after a brief delay
-                        setTimeout(() => {
-                            if (cameraAnimationComplete && !lockedCategory) {
-                                // Ensure camera is exactly at original position before transitioning
-                                camera.position.copy(originalCameraPosition);
-                                controls.target.copy(originalCameraTarget);
-                                controls.update();
-                                
-                                smoothTransitionToMouseFollow();
-                            }
-                        }, 150); // Slightly longer delay to ensure reset is complete
-                        
-                        console.log("Camera view and zoom reset to original position, preparing for mouse following");
+                        if (isMobile && touchEnabled) {
+                            // For mobile, just ensure camera is at original position without additional transitions
+                            camera.position.copy(originalCameraPosition);
+                            controls.target.copy(originalCameraTarget);
+                            controls.update();
+                            console.log("Mobile camera reset complete");
+                        } else {
+                            // Desktop behavior - prepare for smooth transition to mouse following
+                            targetCameraPosition = originalCameraPosition.clone();
+                            
+                            // Start smooth transition to mouse following after a brief delay
+                            setTimeout(() => {
+                                if (cameraAnimationComplete && !lockedCategory) {
+                                    // Ensure camera is exactly at original position before transitioning
+                                    camera.position.copy(originalCameraPosition);
+                                    controls.target.copy(originalCameraTarget);
+                                    controls.update();
+                                    
+                                    smoothTransitionToMouseFollow();
+                                }
+                            }, 150); // Slightly longer delay to ensure reset is complete
+                            
+                            console.log("Desktop camera view and zoom reset to original position, preparing for mouse following");
+                        }
                     }
                 }
                 
@@ -2028,7 +2049,7 @@
                         
                         // Different camera distance for mobile vs desktop
                         if (isMobile) {
-                            cameraDistance *= 0.04; // Farther away for mobile devices
+                            cameraDistance *= 0.03; // Even farther away for mobile devices (was 0.04)
                         } else {
                             cameraDistance *= 0.07; // Original distance for desktop
                         }
@@ -2171,7 +2192,7 @@
             
             // Apply touch sensitivity and convert to normalized coordinates
             const sensitivity = 0.05; // Reduced for smoother control
-            const maxMovement = 50; // Increased horizontal range for mobile
+            const maxMovement = 70; // Increased horizontal range even more for mobile (was 50)
             
             // Convert touch movement to camera offset (invert Y for natural feel)
             const offsetX = touchDelta.x * sensitivity;

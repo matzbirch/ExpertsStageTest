@@ -168,12 +168,13 @@
         let targetCameraPosition = null; // Target position for smooth mouse following
         let cameraTransitioning = false; // Track if camera is in transition to prevent conflicts
         
-        // Mobile device detection and gyro controls
+        // Mobile device detection and touch controls
         let isMobile = false;
-        let gyroEnabled = false;
-        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        let initialOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        let orientationSet = false;
+        let touchEnabled = false;
+        let touchStartPosition = { x: 0, y: 0 };
+        let touchCurrentPosition = { x: 0, y: 0 };
+        let touchDelta = { x: 0, y: 0 };
+        let isTouching = false;
         let stageLight = null; // Store the stage-based light
         
         // Initialize Stats.js for FPS monitoring
@@ -471,7 +472,7 @@
             const followStrength = 1.8; // How much the camera follows the mouse (0-1) - increased from 1.0
             const followRange = 15; // Maximum distance the camera can move from original position - increased from 6
             
-            // Movement range limits to prevent camera from going too far
+            // Movement range limits to prevent camera from going too far (desktop limits)
             const maxMovementX = 22; // Maximum X movement from original position
             const maxMovementY = 6;  // Maximum Y movement from original position
             const maxMovementZ = 5;  // Maximum Z movement from original position
@@ -1601,8 +1602,8 @@
                 
                 // Update camera following if enabled and not transitioning
                 if (cameraAnimationComplete && !lockedCategory && !cameraTransitioning) {
-                    if (isMobile && gyroEnabled) {
-                        // Gyro controls are handled in the deviceorientation event
+                    if (isMobile && touchEnabled) {
+                        // Touch controls are handled in the touch event handlers
                         // No additional processing needed here
                     } else if (mouseFollowEnabled) {
                         // Desktop mouse following
@@ -1907,7 +1908,7 @@
                                     const FloorMaterial = new THREE.MeshStandardMaterial({
                                         color: 0x2b2b2b,
                                         metalness: 0.8,
-                                        roughness: 0.1,
+                                        roughness: 0.01,
                                         envMapIntensity: 0
                                     });
                                     
@@ -1927,9 +1928,10 @@
                                             map: originalMaterial.map, // Use original diffuse map
                                             emissiveMap: originalMaterial.map, // Use same texture as emissive
                                             emissive: new THREE.Color(0xffffff), // White to show texture properly
-                                            emissiveIntensity: 2, // Reduced from 5 for better balance
+                                            emissiveIntensity: 0, // Reduced from 5 for better balance
                                             metalness: 0,
                                             roughness: 1,
+                                            toneMapped: true,
                                         });
                                         child.material = StageMaterial;
                                         console.log("Applied emissive material with texture map to Stage");
@@ -1969,7 +1971,7 @@
                                     roughness: 0.25, // Smoother surface
                                     transmission: 1, // Full transmission
                                     transparent: true,
-                                    opacity: 0.85,
+                                    opacity: 0.95,
                                     ior: 1.42, // Glass IOR
                                     thickness: 1, // Increased thickness for better transmission
                                     dispersion: 1.0, // Maximum dispersion for rainbow effect
@@ -2100,7 +2102,7 @@
             document.body.innerHTML = `<div style="color: white; padding: 20px; font-family: Arial;">Error: ${error.message}</div>`;
         }
 
-        // Mobile device detection and gyro control functions
+        // Mobile device detection and touch control functions
         function detectMobileDevice() {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
             isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase()) ||
@@ -2108,69 +2110,69 @@
             
             if (isMobile) {
                 console.log("Mobile device detected");
-                requestGyroPermission();
+                requestTouchPermission();
             }
         }
         
-        function requestGyroPermission() {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        function requestTouchPermission() {
+            if (typeof TouchEvent !== 'undefined' && typeof TouchEvent.requestPermission === 'function') {
                 // iOS 13+ permission request
-                DeviceOrientationEvent.requestPermission()
+                TouchEvent.requestPermission()
                     .then(response => {
                         if (response === 'granted') {
-                            enableGyroControls();
+                            enableTouchControls();
                         } else {
-                            console.log("Gyro permission denied");
+                            console.log("Touch permission denied");
                         }
                     })
                     .catch(console.error);
-            } else if (window.DeviceOrientationEvent) {
+            } else if (window.TouchEvent) {
                 // Android and older iOS
-                enableGyroControls();
+                enableTouchControls();
             }
         }
         
-        function enableGyroControls() {
-            gyroEnabled = true;
-            console.log("Gyro controls enabled");
+        function enableTouchControls() {
+            touchEnabled = true;
+            console.log("Touch controls enabled");
             
-            window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+            window.addEventListener('touchstart', handleTouchStart, { passive: true });
+            window.addEventListener('touchmove', handleTouchMove, { passive: true });
+            window.addEventListener('touchend', handleTouchEnd, { passive: true });
             
-            // Disable mouse following on mobile when gyro is active
+            // Disable mouse following on mobile when touch is active
             mouseFollowEnabled = false;
         }
         
-        function handleDeviceOrientation(event) {
-            if (!gyroEnabled || !cameraAnimationComplete || lockedCategory || cameraTransitioning) return;
+        function handleTouchStart(event) {
+            if (!touchEnabled || !cameraAnimationComplete || lockedCategory || cameraTransitioning) return;
             
-            // Get orientation values
-            const alpha = event.alpha || 0; // Z axis (0-360)
-            const beta = event.beta || 0;   // X axis (-180 to 180)
-            const gamma = event.gamma || 0; // Y axis (-90 to 90)
+            // Get touch start position
+            touchStartPosition.x = event.touches[0].clientX;
+            touchStartPosition.y = event.touches[0].clientY;
+            touchCurrentPosition.x = touchStartPosition.x;
+            touchCurrentPosition.y = touchStartPosition.y;
+            isTouching = true;
+        }
+        
+        function handleTouchMove(event) {
+            if (!touchEnabled || !cameraAnimationComplete || lockedCategory || cameraTransitioning || !isTouching) return;
             
-            // Set initial orientation on first reading
-            if (!orientationSet) {
-                initialOrientation = { alpha, beta, gamma };
-                orientationSet = true;
-                return;
-            }
+            // Get current touch position
+            const currentX = event.touches[0].clientX;
+            const currentY = event.touches[0].clientY;
             
-            // Calculate relative movement from initial position
-            let deltaAlpha = alpha - initialOrientation.alpha;
-            let deltaBeta = beta - initialOrientation.beta;
-            let deltaGamma = gamma - initialOrientation.gamma;
+            // Calculate movement delta from start position
+            touchDelta.x = currentX - touchStartPosition.x;
+            touchDelta.y = currentY - touchStartPosition.y;
             
-            // Handle alpha wraparound (0-360 degrees)
-            if (deltaAlpha > 180) deltaAlpha -= 360;
-            if (deltaAlpha < -180) deltaAlpha += 360;
+            // Apply touch sensitivity and convert to normalized coordinates
+            const sensitivity = 0.05; // Reduced for smoother control
+            const maxMovement = 35;
             
-            // Apply sensitivity and limits
-            const sensitivity = 0.3;
-            const maxMovement = 15;
-            
-            // Convert orientation to camera movement
-            const offsetX = (deltaGamma * sensitivity);
-            const offsetY = (-deltaBeta * sensitivity * 0.5);
+            // Convert touch movement to camera offset (invert Y for natural feel)
+            const offsetX = touchDelta.x * sensitivity;
+            const offsetY = -touchDelta.y * sensitivity * 0.5; // Invert Y and reduce vertical sensitivity
             
             // Clamp movements
             const clampedOffsetX = Math.max(-maxMovement, Math.min(maxMovement, offsetX));
@@ -2197,6 +2199,12 @@
                 targetOffset.y += clampedOffsetY * 0.4;
                 controls.target.lerp(targetOffset, lerpFactor);
             }
+        }
+        
+        function handleTouchEnd(event) {
+            isTouching = false;
+            touchDelta.x = 0;
+            touchDelta.y = 0;
         }
         
         // Function to create lights from Stage object geometry
@@ -2258,7 +2266,7 @@
             // Create a RectAreaLight that matches the stage dimensions with extracted color
             const stageRectLight = new THREE.RectAreaLight(
                 lightColor,  // Use extracted color
-                80,         // Intensity
+                2000,         // Intensity
                 size.x,    // Width
                 size.z     // Height
             );
@@ -2266,10 +2274,12 @@
             // Position the light at the stage center, slightly above
             stageRectLight.position.copy(center);
             stageRectLight.position.y = center.y + 0.1; // Slightly above the stage
-            stageRectLight.position.z = center.z + 25; // Move slightly forward
+            stageRectLight.position.z = center.z + 15; // Move slightly forward
             
-            // Rotate to face upward
-            stageRectLight.rotation.x = -Math.PI / 2;
+            // Rotate to face in positive Z direction (forward)
+            stageRectLight.rotation.x = 0; // No X rotation
+            stageRectLight.rotation.y = Math.PI / 1; // No Y rotation
+            stageRectLight.rotation.z = 0; // No Z rotation
             
             // Add to scene
             scene.add(stageRectLight);
@@ -2282,7 +2292,7 @@
             // Also create multiple point lights for better coverage using the same color
             const numPointLights = 6;
             const lightIntensity = 3;
-            const lightDistance = 25;
+            const lightDistance = 5;
             
             for (let i = 0; i < numPointLights; i++) {
                 const angle = (i / numPointLights) * Math.PI * 2;

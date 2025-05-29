@@ -928,6 +928,11 @@
             originalCameraTarget = controls.target.clone();
             originalCameraPosition = camera.position.clone();
             
+            // Store explicit default world axis values for mobile reset
+            const defaultCameraPosition = new THREE.Vector3(0, 5, 1);
+            const defaultCameraTarget = new THREE.Vector3(0, 8, 0);
+            const defaultCameraFov = 45;
+            
             console.log("Controls created with basic limits");
 
 
@@ -1576,13 +1581,17 @@
                 const currentTarget = controls.target.clone();
                 const currentPosition = camera.position.clone();
                 const currentFov = camera.fov;
-                const originalFov = camera.originalFov || 45; // Default to 45 if not stored
                 
-                // Both mobile and desktop: Full reset to original position, target, and FOV
-                const targetPosition = originalCameraPosition.clone();
-                const targetTarget = originalCameraTarget.clone();
+                // Use stored default values or fallback to original values
+                const defaultFov = camera.defaultFov || camera.originalFov || 45;
+                const defaultPosition = camera.defaultPosition || originalCameraPosition;
+                const defaultTarget = camera.defaultTarget || originalCameraTarget;
                 
-                console.log(`Starting camera reset - Current: ${currentPosition.z.toFixed(2)}, Target: ${targetPosition.z.toFixed(2)}, Mobile: ${isMobile}`);
+                // Reset to exact default world axis values
+                const targetPosition = defaultPosition.clone();
+                const targetTarget = defaultTarget.clone();
+                
+                console.log(`Starting camera reset to defaults - Current: ${currentPosition.z.toFixed(2)}, Target: ${targetPosition.z.toFixed(2)}, Mobile: ${isMobile}`);
                 
                 // Animate camera target and position
                 const duration = 1000; // 1 second animation
@@ -1597,15 +1606,15 @@
                         ? 2 * progress * progress 
                         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                     
-                    // Interpolate target position back to original
+                    // Interpolate target position back to default
                     controls.target.lerpVectors(currentTarget, targetTarget, easeInOut);
                     
-                    // Interpolate camera position back to original (zoom out)
+                    // Interpolate camera position back to default
                     camera.position.lerpVectors(currentPosition, targetPosition, easeInOut);
                     
-                    // Interpolate FOV back to original on mobile devices
-                    if (isMobile && Math.abs(currentFov - originalFov) > 0.1) {
-                        camera.fov = currentFov + (originalFov - currentFov) * easeInOut;
+                    // Interpolate FOV back to default on mobile devices
+                    if (isMobile && Math.abs(currentFov - defaultFov) > 0.1) {
+                        camera.fov = currentFov + (defaultFov - currentFov) * easeInOut;
                         camera.updateProjectionMatrix();
                     }
                     
@@ -1614,23 +1623,22 @@
                     if (progress < 1) {
                         requestAnimationFrame(animateReset);
                     } else {
-                        // Reset complete - ensure exact values
-                        camera.position.copy(originalCameraPosition);
-                        controls.target.copy(originalCameraTarget);
+                        // Reset complete - ensure exact default values
+                        camera.position.copy(defaultPosition);
+                        controls.target.copy(defaultTarget);
                         
                         if (isMobile) {
-                            // For mobile, ensure FOV is exactly at original value
-                            camera.fov = originalFov;
+                            // For mobile, ensure all values are exactly at defaults
+                            camera.fov = defaultFov;
                             camera.updateProjectionMatrix();
                             
-                            // For mobile, camera position should never change from original
-                            // Only target changes for angle adjustments
-                            targetCameraPosition = originalCameraPosition.clone();
+                            // Set target camera position to default for touch controls
+                            targetCameraPosition = defaultPosition.clone();
                             
-                            console.log(`Mobile camera complete reset - Position: ${camera.position.z.toFixed(2)} (fixed), FOV: ${camera.fov.toFixed(1)}, Target: (${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)})`);
+                            console.log(`Mobile camera reset to exact defaults - Position: (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(2)}), FOV: ${camera.fov.toFixed(1)}, Target: (${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)})`);
                         } else {
                             // Desktop behavior - prepare for smooth transition to mouse following
-                            targetCameraPosition = originalCameraPosition.clone();
+                            targetCameraPosition = defaultPosition.clone();
                             
                             // Start smooth transition to mouse following after a brief delay
                             setTimeout(() => {
@@ -1639,7 +1647,7 @@
                                 }
                             }, 150);
                             
-                            console.log("Desktop camera reset complete, preparing for mouse following");
+                            console.log("Desktop camera reset to defaults, preparing for mouse following");
                         }
                         
                         controls.update();
@@ -2080,17 +2088,10 @@
                         const size = box.getSize(new THREE.Vector3());
                         const maxDim = Math.max(size.x, size.y, size.z);
                         let fov = camera.fov * (Math.PI / 180);
-                        if (isMobile) {
-                            fov = camera.fov * (Math.PI / 500);
-                        }
                         let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
                         
-                        // Different camera distance for mobile vs desktop
-                        if (isMobile) {
-                            cameraDistance *= 0.07; // Much farther back from center for mobile devices
-                        } else {
-                            cameraDistance *= 0.07; // Original distance for desktop
-                        }
+                        // Use default camera distance for both mobile and desktop
+                        cameraDistance *= 0.07; // Same distance for both mobile and desktop
                         
                         // Store final camera position
                         const finalCameraPosition = new THREE.Vector3(0, 5, cameraDistance);
@@ -2118,14 +2119,19 @@
                             if (progress < 1) {
                                 requestAnimationFrame(animateCamera);
                             } else {
-                                // Animation complete - store final camera position
+                                // Animation complete - store final camera position as the new default
                                 originalCameraPosition = camera.position.clone(); // Update stored position after animation
                                 targetCameraPosition = originalCameraPosition.clone(); // Initialize target position
+                                
+                                // Store the final position as the default world axis position
+                                camera.defaultPosition = originalCameraPosition.clone();
+                                camera.defaultTarget = originalCameraTarget.clone();
                                 
                                 // Store original FOV for mobile reset
                                 if (!camera.originalFov) {
                                     camera.originalFov = camera.fov;
                                 }
+                                camera.defaultFov = camera.originalFov;
                                 
                                 // Enable camera animation complete flag and mouse following
                                 cameraAnimationComplete = true;
@@ -2133,7 +2139,7 @@
                                     mouseFollowEnabled = true;
                                 }
                                 
-                                console.log(`Camera animation complete, final position stored at z: ${camera.position.z.toFixed(2)} for ${isMobile ? 'mobile' : 'desktop'}`);
+                                console.log(`Camera animation complete, default position stored at z: ${camera.position.z.toFixed(2)} for ${isMobile ? 'mobile' : 'desktop'}`);
                             }
                         }
                         

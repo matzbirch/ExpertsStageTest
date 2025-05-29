@@ -1623,10 +1623,11 @@
                             camera.fov = originalFov;
                             camera.updateProjectionMatrix();
                             
-                            // Reset the target camera position for touch controls
+                            // For mobile, camera position should never change from original
+                            // Only target changes for angle adjustments
                             targetCameraPosition = originalCameraPosition.clone();
                             
-                            console.log(`Mobile camera complete reset - Position: ${camera.position.z.toFixed(2)}, FOV: ${camera.fov.toFixed(1)}, Target: (${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)})`);
+                            console.log(`Mobile camera complete reset - Position: ${camera.position.z.toFixed(2)} (fixed), FOV: ${camera.fov.toFixed(1)}, Target: (${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)})`);
                         } else {
                             // Desktop behavior - prepare for smooth transition to mouse following
                             targetCameraPosition = originalCameraPosition.clone();
@@ -2234,38 +2235,50 @@
             touchDelta.x = currentX - touchStartPosition.x;
             touchDelta.y = currentY - touchStartPosition.y;
             
-            // Apply touch sensitivity and convert to normalized coordinates
-            const sensitivity = 0.05; // Reduced for smoother control
-            const maxMovement = 70; // Increased horizontal range even more for mobile (was 50)
+            // Apply touch sensitivity for angle changes
+            const sensitivity = 0.002; // Reduced sensitivity for angle changes
+            const maxAngleChange = 1.2; // Maximum angle change in radians
             
-            // Convert touch movement to camera offset (invert Y for natural feel)
-            const offsetX = touchDelta.x * sensitivity;
-            const offsetY = -touchDelta.y * sensitivity * 0.3; // Reduced vertical sensitivity even more
+            // Convert touch movement to angle changes
+            const deltaYaw = touchDelta.x * sensitivity; // Horizontal movement = yaw rotation
+            const deltaPitch = touchDelta.y * sensitivity; // Vertical movement = pitch rotation
             
-            // Clamp movements with much larger horizontal range and smaller vertical range for mobile
-            const clampedOffsetX = Math.max(-maxMovement, Math.min(maxMovement, offsetX));
-            const clampedOffsetY = Math.max(-maxMovement * 0.2, Math.min(maxMovement * 0.2, offsetY)); // Much smaller vertical range
+            // Clamp angle changes to prevent excessive rotation
+            const clampedDeltaYaw = Math.max(-maxAngleChange, Math.min(maxAngleChange, deltaYaw));
+            const clampedDeltaPitch = Math.max(-maxAngleChange * 0.5, Math.min(maxAngleChange * 0.5, deltaPitch)); // Reduce vertical range
             
-            // Apply to camera position
-            if (originalCameraPosition) {
-                if (!targetCameraPosition) {
-                    targetCameraPosition = originalCameraPosition.clone();
-                }
+            // Camera position stays fixed - only change the target for angle rotation
+            if (originalCameraTarget && originalCameraPosition) {
+                // Calculate new target based on angle changes from original target
+                const distanceToTarget = originalCameraPosition.distanceTo(originalCameraTarget);
                 
-                const newTargetPosition = originalCameraPosition.clone();
-                newTargetPosition.x += clampedOffsetX;
-                newTargetPosition.y += clampedOffsetY;
+                // Create spherical coordinates for the target relative to camera
+                const direction = originalCameraTarget.clone().sub(originalCameraPosition).normalize();
                 
-                // Smooth interpolation
-                const lerpFactor = 0.1;
-                targetCameraPosition.lerp(newTargetPosition, lerpFactor);
-                camera.position.copy(targetCameraPosition);
+                // Convert to spherical coordinates
+                const spherical = new THREE.Spherical();
+                spherical.setFromVector3(direction);
                 
-                // Adjust target slightly for dynamic feel
-                const targetOffset = originalCameraTarget.clone();
-                targetOffset.x += clampedOffsetX * 0.4;
-                targetOffset.y += clampedOffsetY * 0.4;
-                controls.target.lerp(targetOffset, lerpFactor);
+                // Apply angle changes
+                spherical.theta += clampedDeltaYaw; // Horizontal rotation (yaw)
+                spherical.phi -= clampedDeltaPitch; // Vertical rotation (pitch) - inverted for natural feel
+                
+                // Clamp vertical angle to prevent flipping
+                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+                
+                // Convert back to cartesian and set new target
+                const newDirection = new THREE.Vector3();
+                newDirection.setFromSpherical(spherical);
+                
+                // Calculate new target position at the same distance
+                const newTarget = camera.position.clone().add(newDirection.multiplyScalar(distanceToTarget));
+                
+                // Smooth interpolation to new target
+                const lerpFactor = 0.15; // Smooth following
+                controls.target.lerp(newTarget, lerpFactor);
+                
+                // Ensure camera position remains exactly at its current position
+                // (Don't modify camera.position at all)
             }
         }
         
@@ -2273,6 +2286,9 @@
             isTouching = false;
             touchDelta.x = 0;
             touchDelta.y = 0;
+            
+            // Ensure camera position remains at its fixed location
+            // (No position changes needed since we only modify target)
         }
         
         // Function to create lights from Stage object geometry

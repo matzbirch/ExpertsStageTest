@@ -137,7 +137,6 @@
 
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
         import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         // Stats.js is loaded via script tag
         
@@ -149,8 +148,7 @@
         let authorTextObjects = [];
         let categoriesTitleObjects = [];
         let raycaster, mouse;
-        let composer, ssrPass;
-        let floorObject = null;
+        let composer;
         let authorTextures = {};
         let authorTextTextures = {};
         let categoryTitleTextures = {};
@@ -443,6 +441,17 @@
                 categoryTitleTextures[categoryNum] = createTextTexture(text, categoryTitleFontSize, 'Arial', '#ffffff', '#000000');
                 console.log(`Generated category title texture for: ${text}`);
             });
+        }
+        
+        // Utility function to manually update matrices for objects
+        function updateObjectMatrices(object) {
+            if (object.matrixAutoUpdate === false) {
+                object.updateMatrix();
+            }
+            // Also update children if they exist
+            if (object.children && object.children.length > 0) {
+                object.children.forEach(child => updateObjectMatrices(child));
+            }
         }
         
         // Camera mouse following function
@@ -833,19 +842,17 @@
             console.log("Camera created");
             
             renderer = new THREE.WebGLRenderer({ 
-                antialias: true, // Enable built-in antialiasing for MSAA
+                antialias: false, // Enable built-in antialiasing for MSAA
                 alpha: false,
-                powerPreference: "high-performance",
                 stencil: false,
                 depth: false,
                 logarithmicDepthBuffer: false,
                 preserveDrawingBuffer: false,
-                samples: 4 // Enable 4x MSAA
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Enhanced pixel ratio for better antialiasing
-            const pixelRatio = Math.min(window.devicePixelRatio, 2); // Cap at 2x for performance
+            const pixelRatio = Math.min(window.devicePixelRatio, 1.5); // Cap at 2x for performance
             renderer.setPixelRatio(pixelRatio);
             
             // Enhanced rendering quality settings
@@ -1280,6 +1287,13 @@
                             }
                         });
                     }
+                    
+                    // Manually update matrices since matrixAutoUpdate is disabled
+                    group.category.updateMatrix();
+                    if (group.text) group.text.updateMatrix();
+                    if (group.categoryTitle) group.categoryTitle.updateMatrix();
+                    group.authors.forEach(author => author.updateMatrix());
+                    group.authorTexts.forEach(authorText => authorText.updateMatrix());
                     
                     if (progress < 1) {
                         requestAnimationFrame(animate);
@@ -1868,8 +1882,7 @@
                             
                                 
                                 if (child.name === 'Floor') {
-                                    // Store reference to Floor object for SSR
-                                    floorObject = child;
+                                    // Apply basic material to Floor object
                                     
                                     // Replace with completely new MeshStandardMaterial
                                     const newFloorMaterial = new THREE.MeshStandardMaterial({
@@ -1952,6 +1965,15 @@
                         scene.add(model);
                         console.log("Model added to scene");
                         
+                        // Disable matrix auto update for performance optimization
+                        model.traverse((child) => {
+                            if (child.isMesh || child.isGroup || child.isObject3D) {
+                                child.matrixAutoUpdate = false;
+                                child.updateMatrix(); // Update matrix one final time
+                            }
+                        });
+                        console.log("Matrix auto update disabled for all model objects");
+                        
                         // Count triangles for performance stats
                         performanceStats.triangleCount = countTriangles(model);
                         console.log(`Model triangle count: ${performanceStats.triangleCount.toLocaleString()}`);
@@ -1968,82 +1990,6 @@
                         // Apply text textures to AuthorText and CategoriesTitle objects
                         applyTextTexturesToAuthorText();
                         applyTextTexturesToCategoriesTitle();
-                        
-                        // Add very subtle and realistic SSR
-                        console.log("Adding very subtle and realistic SSR");
-                        
-                        ssrPass = new SSRPass({
-                            renderer,
-                            scene,
-                            camera,
-                            width: window.innerWidth,
-                            height: window.innerHeight,
-                            selects: null,
-                            
-                            // Optimized performance settings
-                            steps: 16,
-                            refineSteps: 2,
-                            rayStep: 0.3,
-                            thickness: 0.2,
-                            
-                            // Optimized distance settings
-                            maxDistance: 60,
-                            fade: 15,
-                            
-                            // Material properties
-                            ior: 1.15,
-                            maxRoughness: 0.9,
-                            
-                            // Edge detection
-                            normalEdgeThreshold: 0.3,
-                            depthEdgeThreshold: 0.3,
-                            roughnessEdgeThreshold: 0.3,
-                            
-                            // Depth handling
-                            minDepthThreshold: 0.95,
-                            maxDepthThreshold: 1.02,
-                            maxDepthDifference: 4,
-                            
-                            // Temporal stability
-                            temporalResolve: true,
-                            temporalResolveMix: 0.85,
-                            temporalResolveCorrectionMix: 0.25,
-                            
-                            // Blur settings
-                            blur: true,
-                            blurMix: 0.7,
-                            blurKernelSize: 8,
-                            blurSharpness: 0.7,
-                            
-                            // Quality settings
-                            spp: 2,
-                            resolutionScale: 0.8,
-                            
-                            // Features
-                            bouncing: false,
-                            missedRays: false,
-                            infiniteThick: false,
-                            
-                            // Surface mapping
-                            useNormalMap: true,
-                            useRoughnessMap: false,
-                            
-                            // Blending
-                            intensity: 0.3,
-                            opacity: 0.2,
-                            blend: 0.4,
-                            
-                            // Physics
-                            fresnel: true,
-                            distanceAttenuation: true
-                        });
-                        
-                        // Insert SSR pass before bloom pass
-                        composer.insertPass(ssrPass, 1);
-                        
-                        // Force SSR update
-                        ssrPass.needsUpdate = true;
-                        console.log("Very subtle and realistic SSR enabled");
                         
                         // Adjust camera to fit the entire model
                         const size = box.getSize(new THREE.Vector3());
@@ -2114,15 +2060,10 @@
                 camera.updateProjectionMatrix();
                 
                 // Update pixel ratio
-                const newPixelRatio = Math.min(window.devicePixelRatio, 2);
+                const newPixelRatio = Math.min(window.devicePixelRatio, 1.5);
                 renderer.setPixelRatio(newPixelRatio);
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 composer.setSize(window.innerWidth, window.innerHeight); // Also resize composer
-                
-                // Update SSR pass dimensions
-                if (ssrPass) {
-                    ssrPass.setSize(window.innerWidth, window.innerHeight);
-                }
             });
             
         } catch (error) {

@@ -852,6 +852,7 @@
             
             // Add black fog in the distance
             scene.fog = new THREE.Fog(0x000000, 80, 200);
+         
             
             console.log("Scene created");
             
@@ -1412,22 +1413,20 @@
                     closePopup();
                 }
                 
-                // Only reset camera if there's a locked category
+                // Only reset camera if there's a locked category or if mouse following is not active
+                // This prevents accidental camera reset when mouse following is working
                 if (lockedCategory) {
                     // Reset any locked category when clicking elsewhere
                     resetCategoryToOriginal(lockedCategory);
                     lockedCategory = null;
                 
-                    // Only reset camera position on desktop, not on mobile
-                    if (!isMobile) {
-                        // Desktop: reset camera to default view
-                        resetCameraToDefault();
-                    }
-                } else if (!isMobile && (!mouseFollowEnabled || cameraTransitioning)) {
-                    // Desktop only: reset camera view if mouse following is disabled or camera is transitioning
+                    // Simply reset camera to default view without tilt animation
+                    resetCameraToDefault();
+                } else if (!mouseFollowEnabled || cameraTransitioning) {
+                    // Only reset camera view if mouse following is disabled or camera is transitioning
                     resetCameraView();
                 }
-                // Mobile: do nothing - let touch controls continue from current position
+                // If mouse following is active and no category is locked, do nothing (let mouse following continue)
             }
             
             function tiltCameraToCategory(categoryObject) {
@@ -1443,21 +1442,32 @@
                 const currentPosition = camera.position.clone();
                 const currentTarget = controls.target.clone();
                 
+                // Store original FOV for reset
+                if (!camera.originalFov) {
+                    camera.originalFov = camera.fov;
+                }
+                const currentFov = camera.fov;
+                
                 // Calculate new target for camera to look at
                 const newTarget = categoryPosition.clone();
                 
                 // Calculate zoom-in position with different zoom levels for mobile vs desktop
                 const direction = currentPosition.clone().sub(newTarget).normalize();
                 let zoomFactor;
+                let newFov = currentFov; // Default: no FOV change
+                
                 if (isMobile) {
-                    zoomFactor = 0.5; // Zoom in more on mobile (50% of original distance)
+                    zoomFactor = 0.4; // Zoom in more on mobile (40% of original distance)
+                    newFov = currentFov * 0.7; // Reduce FOV by 30% for additional zoom effect on mobile
                 } else {
                     zoomFactor = 0.7; // Original zoom for desktop (70% of original distance)
+                    // No FOV change for desktop
                 }
+                
                 const zoomDistance = currentPosition.distanceTo(newTarget) * zoomFactor;
                 const newPosition = newTarget.clone().add(direction.multiplyScalar(zoomDistance));
                 
-                // Animate camera tilt and zoom
+                // Animate camera tilt, zoom, and FOV change
                 const duration = 1000; // 1 second animation
                 const startTime = Date.now();
                 
@@ -1476,6 +1486,12 @@
                     // Interpolate camera position (zoom in)
                     camera.position.lerpVectors(currentPosition, newPosition, easeInOut);
                     
+                    // Interpolate FOV on mobile devices
+                    if (isMobile) {
+                        camera.fov = currentFov + (newFov - currentFov) * easeInOut;
+                        camera.updateProjectionMatrix();
+                    }
+                    
                     controls.update();
                     
                     if (progress < 1) {
@@ -1483,7 +1499,7 @@
                     } else {
                         // Tilt complete - camera is now locked to category
                         cameraTransitioning = false;
-                        console.log(`Camera tilted and zoomed to focus on: ${categoryObject.name}`);
+                        console.log(`Camera tilted and zoomed to focus on: ${categoryObject.name}${isMobile ? ' with FOV change' : ''}`);
                     }
                 }
                 
@@ -1559,8 +1575,30 @@
                 // Store current target and position
                 const currentTarget = controls.target.clone();
                 const currentPosition = camera.position.clone();
+                const currentFov = camera.fov;
+                const originalFov = camera.originalFov || camera.fov; // Use stored original FOV or current if not stored
                 
-                // Animate camera target and position back to original
+                // For mobile: preserve current angle/target, only reset position and zoom
+                // For desktop: reset everything including angle
+                let targetPosition, targetTarget;
+                
+                if (isMobile) {
+                    // Mobile: Keep current target (angle), only reset position to original distance
+                    targetTarget = currentTarget.clone(); // Preserve current angle
+                    
+                    // Calculate direction from current target to current camera position
+                    const direction = currentPosition.clone().sub(currentTarget).normalize();
+                    
+                    // Set camera to original distance but in current direction
+                    const originalDistance = originalCameraPosition.distanceTo(originalCameraTarget);
+                    targetPosition = currentTarget.clone().add(direction.multiplyScalar(originalDistance));
+                } else {
+                    // Desktop: Full reset to original position and target
+                    targetPosition = originalCameraPosition.clone();
+                    targetTarget = originalCameraTarget.clone();
+                }
+                
+                // Animate camera target and position
                 const duration = 1000; // 1 second animation
                 const startTime = Date.now();
                 
@@ -1573,11 +1611,17 @@
                         ? 2 * progress * progress 
                         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                     
-                    // Interpolate target position back to original
-                    controls.target.lerpVectors(currentTarget, originalCameraTarget, easeInOut);
+                    // Interpolate target position
+                    controls.target.lerpVectors(currentTarget, targetTarget, easeInOut);
                     
-                    // Interpolate camera position back to original (zoom out)
-                    camera.position.lerpVectors(currentPosition, originalCameraPosition, easeInOut);
+                    // Interpolate camera position (zoom out to original distance)
+                    camera.position.lerpVectors(currentPosition, targetPosition, easeInOut);
+                    
+                    // Interpolate FOV back to original on mobile devices
+                    if (isMobile && currentFov !== originalFov) {
+                        camera.fov = currentFov + (originalFov - currentFov) * easeInOut;
+                        camera.updateProjectionMatrix();
+                    }
                     
                     controls.update();
                     
@@ -1588,11 +1632,10 @@
                         cameraTransitioning = false;
                         
                         if (isMobile && touchEnabled) {
-                            // For mobile, just ensure camera is at original position without additional transitions
-                            camera.position.copy(originalCameraPosition);
-                            controls.target.copy(originalCameraTarget);
-                            controls.update();
-                            console.log("Mobile camera reset complete");
+                            // For mobile, update the stored original position to current position for touch controls
+                            // but keep the target unchanged to preserve angle
+                            targetCameraPosition = camera.position.clone();
+                            console.log("Mobile camera reset complete - position, zoom, and FOV reset, angle preserved");
                         } else {
                             // Desktop behavior - prepare for smooth transition to mouse following
                             targetCameraPosition = originalCameraPosition.clone();
@@ -2046,12 +2089,15 @@
                         // Adjust camera to fit the entire model
                         const size = box.getSize(new THREE.Vector3());
                         const maxDim = Math.max(size.x, size.y, size.z);
-                        const fov = camera.fov * (Math.PI / 180);
+                        let fov = camera.fov * (Math.PI / 180);
+                        if (isMobile) {
+                            fov = camera.fov * (Math.PI / 125);
+                        }
                         let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
                         
                         // Different camera distance for mobile vs desktop
                         if (isMobile) {
-                            cameraDistance *= 0.20; // Much farther back from center for mobile devices
+                            cameraDistance *= 0.07; // Much farther back from center for mobile devices
                         } else {
                             cameraDistance *= 0.07; // Original distance for desktop
                         }

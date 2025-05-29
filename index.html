@@ -1457,7 +1457,7 @@
                 let newFov = currentFov; // Default: no FOV change
                 
                 if (isMobile) {
-                    zoomFactor = 0.4; // Zoom in more on mobile (40% of original distance)
+                    zoomFactor = 0.6; // Zoom in more on mobile (40% of original distance)
                     newFov = currentFov * 0.7; // Reduce FOV by 30% for additional zoom effect on mobile
                 } else {
                     zoomFactor = 0.7; // Original zoom for desktop (70% of original distance)
@@ -2091,7 +2091,7 @@
                         const maxDim = Math.max(size.x, size.y, size.z);
                         let fov = camera.fov * (Math.PI / 180);
                         if (isMobile) {
-                            fov = camera.fov * (Math.PI / 125);
+                            fov = camera.fov * (Math.PI / 250);
                         }
                         let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
                         

@@ -101,47 +101,7 @@
         .close-btn:hover {
             color: #333;
         }
-        .stats-panel {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #333;
-            z-index: 1001;
-            min-width: 200px;
-            backdrop-filter: blur(5px);
-        }
-        .stats-panel h4 {
-            margin: 0 0 8px 0;
-            color: #ffffff;
-            font-size: 14px;
-            text-align: center;
-            border-bottom: 1px solid #333;
-            padding-bottom: 5px;
-        }
-        .stats-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 3px 0;
-        }
-        .stats-label {
-            color: #cccccc;
-        }
-        .stats-value {
-            color: #00ff00;
-            font-weight: bold;
-        }
-        .stats-value.warning {
-            color: #ffaa00;
-        }
-        .stats-value.error {
-            color: #ff4444;
-        }
+        /* Stats.js will be added dynamically */
     </style>
 </head>
 <body>
@@ -160,42 +120,6 @@
         <button class="view-report-btn" id="view-report-btn" onclick="openReport()">View Report</button>
     </div>
 
-    <div class="stats-panel" id="stats-panel">
-        <h4>Performance Metrics</h4>
-        <div class="stats-row">
-            <span class="stats-label">FPS:</span>
-            <span class="stats-value" id="fps-value">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Frame Time:</span>
-            <span class="stats-value" id="frame-time-value">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Model Load:</span>
-            <span class="stats-value" id="model-load-time">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Textures Load:</span>
-            <span class="stats-value" id="texture-load-time">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Config Load:</span>
-            <span class="stats-value" id="config-load-time">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Total Load:</span>
-            <span class="stats-value" id="total-load-time">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Memory:</span>
-            <span class="stats-value" id="memory-usage">--</span>
-        </div>
-        <div class="stats-row">
-            <span class="stats-label">Triangles:</span>
-            <span class="stats-value" id="triangle-count">--</span>
-        </div>
-    </div>
-
     <script type="importmap">
     {
         "imports": {
@@ -204,6 +128,7 @@
         }
     }
     </script>
+    <script src="https://unpkg.com/stats.js@0.17.0/build/stats.min.js"></script>
     <script type="module">
         // Import Three.js using import map
         import * as THREE from 'three';
@@ -214,8 +139,7 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
         import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-        import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
-        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        // Stats.js is loaded via script tag
         
         console.log("Script started");
         
@@ -225,7 +149,7 @@
         let authorTextObjects = [];
         let categoriesTitleObjects = [];
         let raycaster, mouse;
-        let composer, ssrPass, fxaaPass;
+        let composer, ssrPass;
         let floorObject = null;
         let authorTextures = {};
         let authorTextTextures = {};
@@ -244,6 +168,11 @@
         let mousePosition = { x: 0, y: 0 }; // Normalized mouse position (-1 to 1)
         let targetCameraPosition = null; // Target position for smooth mouse following
         let cameraTransitioning = false; // Track if camera is in transition to prevent conflicts
+        
+        // Initialize Stats.js for FPS monitoring
+        const stats = new Stats();
+        stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+        document.body.appendChild(stats.dom);
         
         // Performance monitoring variables
         let performanceStats = {
@@ -525,8 +454,8 @@
             const followRange = 15; // Maximum distance the camera can move from original position - increased from 6
             
             // Movement range limits to prevent camera from going too far
-            const maxMovementX = 24; // Maximum X movement from original position
-            const maxMovementY = 7;  // Maximum Y movement from original position
+            const maxMovementX = 22; // Maximum X movement from original position
+            const maxMovementY = 6;  // Maximum Y movement from original position
             const maxMovementZ = 5;  // Maximum Z movement from original position
             
             // Calculate offset from mouse position
@@ -904,18 +833,19 @@
             console.log("Camera created");
             
             renderer = new THREE.WebGLRenderer({ 
-                antialias: true,
+                antialias: true, // Enable built-in antialiasing for MSAA
                 alpha: false,
                 powerPreference: "high-performance",
                 stencil: false,
-                depth: true,
+                depth: false,
                 logarithmicDepthBuffer: false,
-                preserveDrawingBuffer: false
+                preserveDrawingBuffer: false,
+                samples: 4 // Enable 4x MSAA
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Enhanced pixel ratio for better antialiasing
-            const pixelRatio = Math.min(window.devicePixelRatio, 3); // Cap at 2x for performance
+            const pixelRatio = Math.min(window.devicePixelRatio, 2); // Cap at 2x for performance
             renderer.setPixelRatio(pixelRatio);
             
             // Enhanced rendering quality settings
@@ -933,32 +863,23 @@
             
             // Disable shadows to eliminate potential line artifacts
             renderer.shadowMap.enabled = false;
-            // renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
-            // renderer.shadowMap.autoUpdate = true;
+
             
             document.body.appendChild(renderer.domElement);
             console.log("Renderer created and added to DOM");
             
-            // Set up enhanced post-processing with antialiasing
+            // Set up enhanced post-processing with MSAA antialiasing
             composer = new EffectComposer(renderer);
             
             // Add the main render pass
             const renderPass = new RenderPass(scene, camera);
             composer.addPass(renderPass);
             
-            // Add FXAA pass for better edge antialiasing
-            fxaaPass = new ShaderPass(FXAAShader);
-            fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
-            fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
-            composer.addPass(fxaaPass);
-            
-            // SSR will be added after model loads and Floor object is found
-            
             // Add output pass for proper color space (this should be last)
             const outputPass = new OutputPass();
             composer.addPass(outputPass);
             
-            console.log("Enhanced post-processing with FXAA antialiasing initialized");
+            console.log("Enhanced post-processing with MSAA antialiasing initialized");
 
             // Controls
             controls = new OrbitControls(camera, renderer.domElement);
@@ -1000,14 +921,6 @@
             rimLight3.castShadow = false;
             scene.add(rimLight3);
 
-            const rimLight4 = new THREE.DirectionalLight(0xffffff, 2);
-            rimLight4.position.set(0, -40, 30); // Far front for rim effect
-            rimLight4.castShadow = false;
-            scene.add(rimLight4);
-
-            // Add ambient light for overall scene illumination
-            const ambientLight = new THREE.AmbientLight(0x404040, 6); // Soft white light with moderate intensity
-            scene.add(ambientLight);
 
             console.log("Enhanced lighting with multiple front-facing lights and ambient light added");
 
@@ -1464,17 +1377,20 @@
                     closePopup();
                 }
                 
-                // Reset any locked category when clicking elsewhere
+                // Only reset camera if there's a locked category or if mouse following is not active
+                // This prevents accidental camera reset when mouse following is working
                 if (lockedCategory) {
+                    // Reset any locked category when clicking elsewhere
                     resetCategoryToOriginal(lockedCategory);
                     lockedCategory = null;
                 
                     // Simply reset camera to default view without tilt animation
                     resetCameraToDefault();
-                } else {
-                    // Reset camera view to original target (for other cases)
-                resetCameraView();
+                } else if (!mouseFollowEnabled || cameraTransitioning) {
+                    // Only reset camera view if mouse following is disabled or camera is transitioning
+                    resetCameraView();
                 }
+                // If mouse following is active and no category is locked, do nothing (let mouse following continue)
             }
             
             function tiltCameraToCategory(categoryObject) {
@@ -1650,10 +1566,9 @@
 
             // Animation loop
             function animate() {
-                requestAnimationFrame(animate);
+                stats.begin(); // Start stats.js monitoring
                 
-                // Update performance stats
-                updatePerformanceStats();
+                requestAnimationFrame(animate);
                 
                 // Update camera following if enabled and not transitioning
                 if (cameraAnimationComplete && mouseFollowEnabled && !lockedCategory && !cameraTransitioning) {
@@ -1662,14 +1577,13 @@
                 
                 controls.update();
                 composer.render(); // Use composer instead of renderer.render
+                
+                stats.end(); // End stats.js monitoring
             }
             
             // Start animation
             animate();
             console.log("Animation started");
-
-            // Initialize stats display
-            updateStatsDisplay();
 
             // Load text and links configuration
             loadTextAndLinksConfig();
@@ -1864,7 +1778,7 @@
                     const authorNumber = authorTextObject.name.replace(/\D/g, '');
                     if (authorNumber && authorTextTextures[authorNumber]) {
                         // Create material with text as opacity map
-                        const textMaterial = new THREE.MeshBasicMaterial({
+                        const textMaterial = new THREE.MeshLambertMaterial({
                             color: 0xffffff, // White base color
                             alphaMap: authorTextTextures[authorNumber], // Use text texture as opacity
                             transparent: true,
@@ -1896,7 +1810,7 @@
                     const categoryNumber = categoryTitleObject.name.replace(/\D/g, '');
                     if (categoryNumber && categoryTitleTextures[categoryNumber]) {
                         // Create material with text as opacity map
-                        const textMaterial = new THREE.MeshBasicMaterial({
+                        const textMaterial = new THREE.MeshLambertMaterial({
                             color: 0xffffff, // White base color
                             alphaMap: categoryTitleTextures[categoryNumber], // Use text texture as opacity
                             transparent: true,
@@ -1952,52 +1866,6 @@
                                 child.receiveShadow = false;
                             }
                             
-                            // Convert materials to MeshPhysicalMaterial if not already
-                            if (child.isMesh && child.material) {
-                                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                                
-                                materials.forEach((mat, index) => {
-                                    if (!(mat instanceof THREE.MeshPhysicalMaterial)) {
-                                        // Create new MeshPhysicalMaterial preserving original properties
-                                        const newMaterial = new THREE.MeshPhysicalMaterial({
-                                            color: mat.color || new THREE.Color(0xffffff),
-                                            map: mat.map || null,
-                                            normalMap: mat.normalMap || null,
-                                            roughnessMap: mat.roughnessMap || null,
-                                            metalnessMap: mat.metalnessMap || null,
-                                            emissive: mat.emissive || new THREE.Color(0x000000),
-                                            emissiveMap: mat.emissiveMap || null,
-                                            transparent: mat.transparent || false,
-                                            opacity: mat.opacity !== undefined ? mat.opacity : 1.0,
-                                            alphaMap: mat.alphaMap || null,
-                                            side: mat.side !== undefined ? mat.side : THREE.FrontSide,
-                                            roughness: mat.roughness !== undefined ? mat.roughness : 0.5,
-                                            metalness: mat.metalness !== undefined ? mat.metalness : 0.0,
-                                            envMapIntensity: 1.0,
-                                            clearcoat: 0,
-                                            transmission: 0,
-                                            ior: 1.5
-                                        });
-                                        
-                                        // Ensure proper color space for all texture maps
-                                        if (newMaterial.map) newMaterial.map.colorSpace = THREE.SRGBColorSpace;
-                                        if (newMaterial.emissiveMap) newMaterial.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-                                        
-                                        if (Array.isArray(child.material)) {
-                                            child.material[index] = newMaterial;
-                                        } else {
-                                            child.material = newMaterial;
-                                        }
-                                        
-                                        console.log("Converted material to MeshPhysicalMaterial for:", child.name);
-                                    }
-                                });
-                                
-                                // Special material treatments for specific objects
-                                // Debug Text object name
-                                if (child.name && child.name.toLowerCase().includes('text')) {
-                                    console.log("Text object found with exact name: '" + child.name + "' (length: " + child.name.length + ")");
-                                }
                                 
                                 if (child.name === 'Floor') {
                                     // Store reference to Floor object for SSR
@@ -2011,56 +1879,25 @@
                                         envMapIntensity: 0
                                     });
                                     
-                                    // Apply new material to all floor meshes
-                                    child.traverse((floorChild) => {
-                                        if (floorChild.isMesh) {
-                                            floorChild.material = newFloorMaterial.clone();
-                                            console.log("Replaced with completely new MeshStandardMaterial for:", floorChild.name);
-                                        }
-                                    });
-                                }
-                                else if (child.name && child.name.trim().toLowerCase() === 'text') {
-                                    // Text is a group, apply material to all child meshes
-                                    console.log("Found Text group, applying materials to child meshes");
-                                    console.log("Text group type:", child.type);
-                                    console.log("Text group children count:", child.children.length);
-                                    
-                                    child.traverse((textChild) => {
-                                        console.log("Text child:", textChild.name, "Type:", textChild.type, "IsMesh:", textChild.isMesh, "HasMaterial:", !!textChild.material);
-                                        
-                                        if (textChild.isMesh && textChild.material) {
-                                            const textMaterials = Array.isArray(textChild.material) ? textChild.material : [textChild.material];
-                                            textMaterials.forEach((mat) => {
-                                                mat.color.set(0xffffff); // White
-                                                mat.emissive.set(0xffffff); // White
-                                                mat.emissiveIntensity = 0;
-                                                mat.metalness = 0; // Non-metallic
-                                                mat.roughness = 1; // Slightly rough for readability
-                                                console.log("Applied white material to Text mesh:", textChild.name);
-                                            });
-                                        }
-                                    });
                                 }
                                 else if (child.name === 'Stage') {
                                     // Make Stage emissive using original texture as emissive map
-                                    const stageMaterials = Array.isArray(child.material) ? child.material : [child.material];
-                                    stageMaterials.forEach((mat) => {
-                                        // Use the original texture (diffuse map) as emissive map
-                                        if (mat.map) {
-                                            mat.emissiveMap = mat.map.clone();
-                                            mat.emissive.set(0xffffff); // White to show the texture properly
-                                            mat.emissiveIntensity = 2; // Reduced from 5 for better balance
-                                        } else {
-                                            mat.emissive.set(0x2a2a4a); // Fallback blue-ish emissive glow
-                                            mat.emissiveIntensity = 5;
-                                        }
-                                        mat.metalness = 0;
-                                        mat.roughness = 1;
+                                    if (child.isMesh && child.material) {
+                                        const originalMaterial = child.material;
+                                        const StageMaterial = new THREE.MeshStandardMaterial({
+                                            map: originalMaterial.map, // Use original diffuse map
+                                            emissiveMap: originalMaterial.map, // Use same texture as emissive
+                                            emissive: new THREE.Color(0xffffff), // White to show texture properly
+                                            emissiveIntensity: 2, // Reduced from 5 for better balance
+                                            metalness: 0,
+                                            roughness: 1,
+                                        });
+                                        child.material = StageMaterial;
                                         console.log("Applied emissive material with texture map to Stage");
-                                    });
+                                    }
                                 }
 
-                            }
+
                             
                             if (child.name.toLowerCase().includes('author')) {
                                 if (child.name.toLowerCase().includes('authortext')) {
@@ -2086,19 +1923,18 @@
                                 // Apply enhanced glass material with optimal transmission and black tint
                                 const glassMaterial = new THREE.MeshPhysicalMaterial({
                                     color: 0x1a1a1a, // Almost black tint instead of white
-                                    metalness: 0.1,
-                                    roughness: 0.1, // Smoother surface
+                                    metalness: 0.6,
+                                    roughness: 0.25, // Smoother surface
                                     transmission: 1, // Full transmission
                                     transparent: true,
-                                    opacity: 0.7,
+                                    opacity: 0.85,
                                     ior: 1.42, // Glass IOR
-                                    thickness: 2, // Increased thickness for better transmission
-                                    dispersion: 5.0, // Maximum dispersion for rainbow effect
-                                    clearcoat: 0.5, // Small amount for surface reflection
-                                    clearcoatRoughness: 0.02,
+                                    thickness: 1, // Increased thickness for better transmission
+                                    dispersion: 1.0, // Maximum dispersion for rainbow effect
+                                    clearcoat: 0.0, // Small amount for surface reflection
+                                    clearcoatRoughness: 0.0,
                                     envMapIntensity: 0.2, // Minimal environment reflections
                                     reflectivity: 0.25, // Reduced reflectivity
-                                    side: THREE.DoubleSide, // Render both sides for proper transmission
                                     attenuationDistance: 2, // Slightly reduced for more visible tint
                                     attenuationColor: new THREE.Color(0x0a0a0a) // Dark gray for subtle black tinting
                                 });
@@ -2278,16 +2114,10 @@
                 camera.updateProjectionMatrix();
                 
                 // Update pixel ratio
-                const newPixelRatio = Math.min(window.devicePixelRatio, 3);
+                const newPixelRatio = Math.min(window.devicePixelRatio, 2);
                 renderer.setPixelRatio(newPixelRatio);
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 composer.setSize(window.innerWidth, window.innerHeight); // Also resize composer
-                
-                // Update FXAA resolution uniforms
-                if (fxaaPass) {
-                    fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * newPixelRatio);
-                    fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * newPixelRatio);
-                }
                 
                 // Update SSR pass dimensions
                 if (ssrPass) {

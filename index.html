@@ -1921,20 +1921,18 @@
                                     });
                                 }
                                 else if (child.name === 'Stage') {
-                                    // Make Stage emissive using original texture as emissive map
+                                    // Make Stage unaffected by lights using MeshBasicMaterial
                                     if (child.isMesh && child.material) {
                                         const originalMaterial = child.material;
-                                        const StageMaterial = new THREE.MeshStandardMaterial({
+                                        const StageMaterial = new THREE.MeshBasicMaterial({
                                             map: originalMaterial.map, // Use original diffuse map
-                                            emissiveMap: originalMaterial.map, // Use same texture as emissive
-                                            emissive: new THREE.Color(0xffffff), // White to show texture properly
-                                            emissiveIntensity: 0, // Reduced from 5 for better balance
-                                            metalness: 0,
-                                            roughness: 1,
-                                            toneMapped: true,
+                                            transparent: false,
+                                            opacity: 1.0,
+                                            side: THREE.FrontSide,
+                                            toneMapped: false, // Prevent tone mapping to avoid washing out
                                         });
                                         child.material = StageMaterial;
-                                        console.log("Applied emissive material with texture map to Stage");
+                                        console.log("Applied unlit basic material with texture map to Stage");
                                     }
                                     
                                     // Create actual lights from Stage geometry
@@ -1967,11 +1965,11 @@
                                 // Apply enhanced glass material with optimal transmission and black tint
                                 const glassMaterial = new THREE.MeshPhysicalMaterial({
                                     color: 0x1a1a1a, // Almost black tint instead of white
-                                    metalness: 0.6,
-                                    roughness: 0.25, // Smoother surface
+                                    metalness: 0.3,
+                                    roughness: 0.15, // Smoother surface
                                     transmission: 1, // Full transmission
                                     transparent: true,
-                                    opacity: 0.95,
+                                    opacity: 0.85,
                                     ior: 1.42, // Glass IOR
                                     thickness: 1, // Increased thickness for better transmission
                                     dispersion: 1.0, // Maximum dispersion for rainbow effect
@@ -2028,7 +2026,12 @@
                         const fov = camera.fov * (Math.PI / 180);
                         let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
                         
-                        cameraDistance *= 0.12; // Increased from 0.07 to move camera further away
+                        // Different camera distance for mobile vs desktop
+                        if (isMobile) {
+                            cameraDistance *= 0.04; // Farther away for mobile devices
+                        } else {
+                            cameraDistance *= 0.07; // Original distance for desktop
+                        }
                         
                         // Store final camera position
                         const finalCameraPosition = new THREE.Vector3(0, 5, cameraDistance);
@@ -2168,15 +2171,15 @@
             
             // Apply touch sensitivity and convert to normalized coordinates
             const sensitivity = 0.05; // Reduced for smoother control
-            const maxMovement = 60; // Increased significantly for much wider horizontal range
+            const maxMovement = 50; // Increased horizontal range for mobile
             
             // Convert touch movement to camera offset (invert Y for natural feel)
             const offsetX = touchDelta.x * sensitivity;
             const offsetY = -touchDelta.y * sensitivity * 0.3; // Reduced vertical sensitivity even more
             
-            // Clamp movements with much wider horizontal and restricted vertical range
+            // Clamp movements with much larger horizontal range and smaller vertical range for mobile
             const clampedOffsetX = Math.max(-maxMovement, Math.min(maxMovement, offsetX));
-            const clampedOffsetY = Math.max(-maxMovement * 0.15, Math.min(maxMovement * 0.15, offsetY)); // Much more restricted vertical (15% instead of 50%)
+            const clampedOffsetY = Math.max(-maxMovement * 0.2, Math.min(maxMovement * 0.2, offsetY)); // Much smaller vertical range
             
             // Apply to camera position
             if (originalCameraPosition) {

@@ -1576,11 +1576,13 @@
                 const currentTarget = controls.target.clone();
                 const currentPosition = camera.position.clone();
                 const currentFov = camera.fov;
-                const originalFov = camera.originalFov || camera.fov; // Use stored original FOV or current if not stored
+                const originalFov = camera.originalFov || 45; // Default to 45 if not stored
                 
                 // Both mobile and desktop: Full reset to original position, target, and FOV
                 const targetPosition = originalCameraPosition.clone();
                 const targetTarget = originalCameraTarget.clone();
+                
+                console.log(`Starting camera reset - Current: ${currentPosition.z.toFixed(2)}, Target: ${targetPosition.z.toFixed(2)}, Mobile: ${isMobile}`);
                 
                 // Animate camera target and position
                 const duration = 1000; // 1 second animation
@@ -1602,7 +1604,7 @@
                     camera.position.lerpVectors(currentPosition, targetPosition, easeInOut);
                     
                     // Interpolate FOV back to original on mobile devices
-                    if (isMobile && currentFov !== originalFov) {
+                    if (isMobile && Math.abs(currentFov - originalFov) > 0.1) {
                         camera.fov = currentFov + (originalFov - currentFov) * easeInOut;
                         camera.updateProjectionMatrix();
                     }
@@ -1612,22 +1614,19 @@
                     if (progress < 1) {
                         requestAnimationFrame(animateReset);
                     } else {
-                        // Reset complete - handle differently for mobile vs desktop
-                        cameraTransitioning = false;
+                        // Reset complete - ensure exact values
+                        camera.position.copy(originalCameraPosition);
+                        controls.target.copy(originalCameraTarget);
                         
-                        if (isMobile && touchEnabled) {
-                            // For mobile, ensure camera is exactly at original position, target, and FOV
-                            camera.position.copy(originalCameraPosition);
-                            controls.target.copy(originalCameraTarget);
-                            if (camera.originalFov) {
-                                camera.fov = camera.originalFov;
-                                camera.updateProjectionMatrix();
-                            }
-                            controls.update();
+                        if (isMobile) {
+                            // For mobile, ensure FOV is exactly at original value
+                            camera.fov = originalFov;
+                            camera.updateProjectionMatrix();
                             
-                            // Reset the target camera position for touch controls to original position
+                            // Reset the target camera position for touch controls
                             targetCameraPosition = originalCameraPosition.clone();
-                            console.log("Mobile camera complete reset - position, angle, zoom, target, and FOV all reset to default");
+                            
+                            console.log(`Mobile camera complete reset - Position: ${camera.position.z.toFixed(2)}, FOV: ${camera.fov.toFixed(1)}, Target: (${controls.target.x.toFixed(1)}, ${controls.target.y.toFixed(1)}, ${controls.target.z.toFixed(1)})`);
                         } else {
                             // Desktop behavior - prepare for smooth transition to mouse following
                             targetCameraPosition = originalCameraPosition.clone();
@@ -1635,17 +1634,15 @@
                             // Start smooth transition to mouse following after a brief delay
                             setTimeout(() => {
                                 if (cameraAnimationComplete && !lockedCategory) {
-                                    // Ensure camera is exactly at original position before transitioning
-                                    camera.position.copy(originalCameraPosition);
-                                    controls.target.copy(originalCameraTarget);
-                                    controls.update();
-                                    
                                     smoothTransitionToMouseFollow();
                                 }
-                            }, 150); // Slightly longer delay to ensure reset is complete
+                            }, 150);
                             
-                            console.log("Desktop camera view and zoom reset to original position, preparing for mouse following");
+                            console.log("Desktop camera reset complete, preparing for mouse following");
                         }
+                        
+                        controls.update();
+                        cameraTransitioning = false;
                     }
                 }
                 
@@ -2083,7 +2080,7 @@
                         const maxDim = Math.max(size.x, size.y, size.z);
                         let fov = camera.fov * (Math.PI / 180);
                         if (isMobile) {
-                            fov = camera.fov * (Math.PI / 300);
+                            fov = camera.fov * (Math.PI / 500);
                         }
                         let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
                         
@@ -2124,11 +2121,18 @@
                                 originalCameraPosition = camera.position.clone(); // Update stored position after animation
                                 targetCameraPosition = originalCameraPosition.clone(); // Initialize target position
                                 
+                                // Store original FOV for mobile reset
+                                if (!camera.originalFov) {
+                                    camera.originalFov = camera.fov;
+                                }
+                                
                                 // Enable camera animation complete flag and mouse following
                                 cameraAnimationComplete = true;
-                                mouseFollowEnabled = true;
+                                if (!isMobile) {
+                                    mouseFollowEnabled = true;
+                                }
                                 
-                                console.log("Camera animation complete, final position stored, and mouse following enabled");
+                                console.log(`Camera animation complete, final position stored at z: ${camera.position.z.toFixed(2)} for ${isMobile ? 'mobile' : 'desktop'}`);
                             }
                         }
                         

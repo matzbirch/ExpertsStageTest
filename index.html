@@ -928,10 +928,10 @@
             originalCameraTarget = controls.target.clone();
             originalCameraPosition = camera.position.clone();
             
-            // Store explicit default world axis values for mobile reset
-            const defaultCameraPosition = new THREE.Vector3(0, 5, 1);
-            const defaultCameraTarget = new THREE.Vector3(0, 8, 0);
-            const defaultCameraFov = 45;
+            // Store explicit default world axis values
+            camera.defaultPosition = new THREE.Vector3(0, 5, 1);
+            camera.defaultTarget = new THREE.Vector3(0, 8, 0);
+            camera.defaultFov = 45;
             
             console.log("Controls created with basic limits");
 
@@ -2120,18 +2120,18 @@
                                 requestAnimationFrame(animateCamera);
                             } else {
                                 // Animation complete - store final camera position as the new default
-                                originalCameraPosition = camera.position.clone(); // Update stored position after animation
-                                targetCameraPosition = originalCameraPosition.clone(); // Initialize target position
+                                originalCameraPosition = camera.position.clone();
+                                targetCameraPosition = originalCameraPosition.clone();
                                 
-                                // Store the final position as the default world axis position
-                                camera.defaultPosition = originalCameraPosition.clone();
-                                camera.defaultTarget = originalCameraTarget.clone();
+                                // Update the default values with the final calculated position
+                                camera.defaultPosition = camera.position.clone();
+                                camera.defaultTarget = controls.target.clone();
+                                camera.defaultFov = camera.fov;
                                 
                                 // Store original FOV for mobile reset
                                 if (!camera.originalFov) {
                                     camera.originalFov = camera.fov;
                                 }
-                                camera.defaultFov = camera.originalFov;
                                 
                                 // Enable camera animation complete flag and mouse following
                                 cameraAnimationComplete = true;
@@ -2139,7 +2139,7 @@
                                     mouseFollowEnabled = true;
                                 }
                                 
-                                console.log(`Camera animation complete, default position stored at z: ${camera.position.z.toFixed(2)} for ${isMobile ? 'mobile' : 'desktop'}`);
+                                console.log(`Camera animation complete, default values updated - Position: (${camera.defaultPosition.x}, ${camera.defaultPosition.y}, ${camera.defaultPosition.z.toFixed(2)}), Target: (${camera.defaultTarget.x}, ${camera.defaultTarget.y}, ${camera.defaultTarget.z})`);
                             }
                         }
                         
@@ -2237,37 +2237,35 @@
             const currentX = event.touches[0].clientX;
             const currentY = event.touches[0].clientY;
             
-            // Calculate movement delta from start position
-            touchDelta.x = currentX - touchStartPosition.x;
-            touchDelta.y = currentY - touchStartPosition.y;
+            // Calculate movement delta from last frame (not from start position)
+            const deltaX = currentX - touchCurrentPosition.x;
+            const deltaY = currentY - touchCurrentPosition.y;
             
-            // Apply touch sensitivity for angle changes
-            const sensitivity = 0.002; // Reduced sensitivity for angle changes
-            const maxAngleChange = 1.2; // Maximum angle change in radians
+            // Update current touch position for next frame
+            touchCurrentPosition.x = currentX;
+            touchCurrentPosition.y = currentY;
             
-            // Convert touch movement to angle changes
-            const deltaYaw = touchDelta.x * sensitivity; // Horizontal movement = yaw rotation
-            const deltaPitch = touchDelta.y * sensitivity; // Vertical movement = pitch rotation
+            // Apply touch sensitivity for incremental angle changes
+            const sensitivity = 0.005; // Sensitivity for incremental changes
             
-            // Clamp angle changes to prevent excessive rotation
-            const clampedDeltaYaw = Math.max(-maxAngleChange, Math.min(maxAngleChange, deltaYaw));
-            const clampedDeltaPitch = Math.max(-maxAngleChange * 0.5, Math.min(maxAngleChange * 0.5, deltaPitch)); // Reduce vertical range
+            // Convert touch movement to incremental angle changes
+            const deltaYaw = deltaX * sensitivity; // Horizontal movement = yaw rotation
+            const deltaPitch = deltaY * sensitivity; // Vertical movement = pitch rotation
             
-            // Camera position stays fixed - only change the target for angle rotation
-            if (originalCameraTarget && originalCameraPosition) {
-                // Calculate new target based on angle changes from original target
-                const distanceToTarget = originalCameraPosition.distanceTo(originalCameraTarget);
+            // Camera position stays fixed - only change the target incrementally
+            if (controls.target && camera.position) {
+                // Get current direction from camera to target
+                const currentDirection = controls.target.clone().sub(camera.position);
+                const distance = currentDirection.length();
+                currentDirection.normalize();
                 
-                // Create spherical coordinates for the target relative to camera
-                const direction = originalCameraTarget.clone().sub(originalCameraPosition).normalize();
-                
-                // Convert to spherical coordinates
+                // Convert current direction to spherical coordinates
                 const spherical = new THREE.Spherical();
-                spherical.setFromVector3(direction);
+                spherical.setFromVector3(currentDirection);
                 
-                // Apply angle changes
-                spherical.theta += clampedDeltaYaw; // Horizontal rotation (yaw)
-                spherical.phi -= clampedDeltaPitch; // Vertical rotation (pitch) - inverted for natural feel
+                // Apply incremental angle changes
+                spherical.theta += deltaYaw; // Horizontal rotation (yaw)
+                spherical.phi -= deltaPitch; // Vertical rotation (pitch) - inverted for natural feel
                 
                 // Clamp vertical angle to prevent flipping
                 spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
@@ -2276,14 +2274,13 @@
                 const newDirection = new THREE.Vector3();
                 newDirection.setFromSpherical(spherical);
                 
-                // Calculate new target position at the same distance
-                const newTarget = camera.position.clone().add(newDirection.multiplyScalar(distanceToTarget));
+                // Calculate new target position maintaining the same distance
+                const newTarget = camera.position.clone().add(newDirection.multiplyScalar(distance));
                 
-                // Smooth interpolation to new target
-                const lerpFactor = 0.15; // Smooth following
-                controls.target.lerp(newTarget, lerpFactor);
+                // Apply new target directly (no interpolation for immediate response)
+                controls.target.copy(newTarget);
                 
-                // Ensure camera position remains exactly at its current position
+                // Ensure camera position remains exactly fixed
                 // (Don't modify camera.position at all)
             }
         }
